@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import path from 'path';
 
 import { PrismaClient } from '@prisma/client';
 import { errorHandler } from './middleware/errorHandler';
@@ -25,6 +26,9 @@ import preferencesRoutes from './routes/preferences';
 import notificationRoutes from './routes/notifications';
 import currencyRoutes from './routes/currencies';
 import emailRoutes from './routes/email';
+import taskRoutes from './routes/tasks';
+import commentRoutes from './routes/comments';
+import settingsRoutes from './routes/settings';
 
 // Load environment variables
 dotenv.config();
@@ -61,7 +65,17 @@ const limiter = rateLimit({
 });
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "http:", "https:"],
+    },
+  },
+}));
 app.use(compression());
 app.use(morgan('combined'));
 app.use(limiter);
@@ -71,6 +85,14 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from uploads directory with CORS headers
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+}, express.static(path.join(__dirname, '../uploads')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -95,6 +117,9 @@ app.use('/api/preferences', preferencesRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/currencies', currencyRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Error handling middleware
 app.use(notFoundHandler);

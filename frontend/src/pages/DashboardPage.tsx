@@ -13,15 +13,27 @@ import {
   Target,
   Plus,
   FileText,
-  Settings
+  Settings,
+  CalendarRange,
+  Award
 } from 'lucide-react';
 import DashboardCharts from '@/components/dashboard/DashboardCharts';
+import { InteractiveCharts } from '@/components/dashboard/InteractiveCharts';
+import { GoalTracking } from '@/components/dashboard/GoalTracking';
+import { CustomDateRangeAnalytics } from '@/components/dashboard/CustomDateRangeAnalytics';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 
 const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
   const { fetchTimesheets, timesheets, isLoading } = useTimesheetStore();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'goals' | 'comparison' | 'custom'>('overview');
+  const [dateRange, setDateRange] = useState({
+    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
+    end: new Date().toISOString().split('T')[0]
+  });
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [selectedUser, setSelectedUser] = useState<string>('');
   const [stats, setStats] = useState({
     totalHours: 0,
     totalEntries: 0,
@@ -42,35 +54,35 @@ const DashboardPage: React.FC = () => {
   }, [timesheets]);
 
   const calculateStats = () => {
-    const totalHours = timesheets.reduce((sum, ts) => sum + parseFloat(ts.hoursWorked), 0);
+    const totalHours = timesheets.reduce((sum, ts) => sum + Number(ts.hoursWorked), 0);
     const totalEntries = timesheets.length;
-    
-    // Calculate average hours per day
-    const uniqueDays = new Set(timesheets.map(ts => ts.date));
-    const averageHoursPerDay = totalHours / uniqueDays.size;
+    const averageHoursPerDay = totalHours / Math.max(1, new Set(timesheets.map(ts => ts.date)).size);
 
     // Find most active day
-    const dayHours: Record<string, number> = {};
-    timesheets.forEach(ts => {
-      dayHours[ts.date] = (dayHours[ts.date] || 0) + parseFloat(ts.hoursWorked);
-    });
-    const mostActiveDay = Object.entries(dayHours)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || '';
+    const dailyHours = timesheets.reduce((acc, ts) => {
+      acc[ts.date] = (acc[ts.date] || 0) + Number(ts.hoursWorked);
+      return acc;
+    }, {} as Record<string, number>);
+
+    const mostActiveDay = Object.entries(dailyHours).reduce((max, [date, hours]) => 
+      hours > max.hours ? { date, hours } : max, { date: '', hours: 0 }
+    ).date;
 
     // Find most active project
-    const projectHours: Record<string, number> = {};
-    timesheets.forEach(ts => {
-      const projectName = ts.project.name;
-      projectHours[projectName] = (projectHours[projectName] || 0) + parseFloat(ts.hoursWorked);
-    });
-    const mostActiveProject = Object.entries(projectHours)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || '';
+    const projectHours = timesheets.reduce((acc, ts) => {
+      acc[ts.project.name] = (acc[ts.project.name] || 0) + Number(ts.hoursWorked);
+      return acc;
+    }, {} as Record<string, number>);
+
+    const mostActiveProject = Object.entries(projectHours).reduce((max, [name, hours]) => 
+      hours > max.hours ? { name, hours } : max, { name: '', hours: 0 }
+    ).name;
 
     // Work type breakdown
-    const workTypeBreakdown: Record<string, number> = {};
-    timesheets.forEach(ts => {
-      workTypeBreakdown[ts.type] = (workTypeBreakdown[ts.type] || 0) + parseFloat(ts.hoursWorked);
-    });
+    const workTypeBreakdown = timesheets.reduce((acc, ts) => {
+      acc[ts.type] = (acc[ts.type] || 0) + Number(ts.hoursWorked);
+      return acc;
+    }, {} as Record<string, number>);
 
     setStats({
       totalHours,
@@ -82,276 +94,301 @@ const DashboardPage: React.FC = () => {
     });
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  const getTypeColor = (type: string) => {
-    const colors = {
-      WORK: 'bg-blue-500',
-      MEETING: 'bg-purple-500',
-      RESEARCH: 'bg-green-500',
-      TRAINING: 'bg-yellow-500',
-      BREAK: 'bg-gray-500',
-      OTHER: 'bg-orange-500',
-    };
-    return colors[type as keyof typeof colors] || colors.OTHER;
-  };
-
-  const getTypeLabel = (type: string) => {
-    const labels = {
-      WORK: 'Work',
-      MEETING: 'Meeting',
-      RESEARCH: 'Research',
-      TRAINING: 'Training',
-      BREAK: 'Break',
-      OTHER: 'Other',
-    };
-    return labels[type as keyof typeof labels] || type;
-  };
-
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <LoadingSkeleton type="card" rows={4} />
-        <LoadingSkeleton type="chart" />
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Welcome back, {user?.firstName}! Here's your timesheet overview.
-        </p>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Clock className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Hours
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {stats.totalHours.toFixed(1)}h
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">Welcome back, {user?.firstName}!</p>
         </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Calendar className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Entries
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {stats.totalEntries}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <TrendingUp className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Avg Hours/Day
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {stats.averageHoursPerDay.toFixed(1)}h
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Activity className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Active Days
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {new Set(timesheets.map(ts => ts.date)).size}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => navigate('/timesheets/new')}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Entry
+          </button>
+          <button
+            onClick={() => navigate('/reports')}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Reports
+          </button>
         </div>
       </div>
 
-      {/* Mini Charts */}
-      {timesheets.length > 0 && (
+      {/* Tab Navigation */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8 px-6">
+            {[
+              { id: 'overview', label: 'Overview', icon: BarChart3 },
+              { id: 'analytics', label: 'Interactive Analytics', icon: TrendingUp },
+              { id: 'goals', label: 'Goal Tracking', icon: Target },
+              { id: 'comparison', label: 'Team Comparison', icon: Users },
+              { id: 'custom', label: 'Custom Analytics', icon: CalendarRange }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <tab.icon className="h-4 w-4 mr-2" />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Clock className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Total Hours
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {stats.totalHours.toFixed(1)}h
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <FileText className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Total Entries
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {stats.totalEntries}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <TrendingUp className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Avg Hours/Day
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {stats.averageHoursPerDay.toFixed(1)}h
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Activity className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Active Days
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {new Set(timesheets.map(ts => ts.date)).size}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Mini Charts */}
+          {timesheets.length > 0 && (
+            <div className="space-y-6">
+              <h2 className="text-lg font-semibold text-gray-900">Analytics Overview</h2>
+              <DashboardCharts timesheets={timesheets} />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Interactive Analytics Tab */}
+      {activeTab === 'analytics' && (
+        <InteractiveCharts
+          timesheets={timesheets}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          selectedProject={selectedProject}
+          selectedUser={selectedUser}
+          onProjectSelect={setSelectedProject}
+          onUserSelect={setSelectedUser}
+        />
+      )}
+
+      {/* Goal Tracking Tab */}
+      {activeTab === 'goals' && (
+        <GoalTracking
+          timesheets={timesheets}
+          onGoalCreate={(goal) => console.log('Create goal:', goal)}
+          onGoalUpdate={(id, updates) => console.log('Update goal:', id, updates)}
+          onGoalDelete={(id) => console.log('Delete goal:', id)}
+        />
+      )}
+
+      {/* Team Comparison Tab */}
+      {activeTab === 'comparison' && (
         <div className="space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900">Analytics Overview</h2>
-          <DashboardCharts timesheets={timesheets} />
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <Users className="h-6 w-6 text-blue-600 mr-2" />
+                <h2 className="text-xl font-semibold text-gray-900">Team Performance Comparison</h2>
+              </div>
+            </div>
+            
+            {/* Team Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <Users className="h-8 w-8 text-blue-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-blue-600">Active Team Members</p>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {new Set(timesheets.map(ts => ts.user.id)).size}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <Folder className="h-8 w-8 text-green-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-green-600">Active Projects</p>
+                    <p className="text-2xl font-bold text-green-900">
+                      {new Set(timesheets.map(ts => ts.project.id)).size}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <Award className="h-8 w-8 text-purple-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-purple-600">Avg Team Hours/Day</p>
+                    <p className="text-2xl font-bold text-purple-900">
+                      {(stats.totalHours / Math.max(1, new Set(timesheets.map(ts => ts.date)).size)).toFixed(1)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Team Performance Table */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team Member</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Hours</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entries</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Projects</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Hours/Entry</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Performance</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {Array.from(new Set(timesheets.map(ts => ts.user.id))).map(userId => {
+                    const user = timesheets.find(ts => ts.user.id === userId)?.user;
+                    const userTimesheets = timesheets.filter(ts => ts.user.id === userId);
+                    const totalHours = userTimesheets.reduce((sum, ts) => sum + Number(ts.hoursWorked), 0);
+                    const uniqueProjects = new Set(userTimesheets.map(ts => ts.project.id)).size;
+                    const avgHoursPerEntry = totalHours / userTimesheets.length;
+                    const performance = (totalHours / Math.max(1, new Set(userTimesheets.map(ts => ts.date)).size)).toFixed(1);
+
+                    return (
+                      <tr key={userId} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span className="text-sm font-medium text-blue-600">
+                                  {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {user?.firstName} {user?.lastName}
+                              </div>
+                              <div className="text-sm text-gray-500">{user?.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{totalHours.toFixed(1)}h</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{userTimesheets.length}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{uniqueProjects}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{avgHoursPerEntry.toFixed(1)}h</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                              <div
+                                className="h-2 rounded-full bg-blue-500"
+                                style={{ width: `${Math.min((parseFloat(performance) / 8) * 100, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-sm text-gray-900">{performance}h/day</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Charts and Details */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Work Type Breakdown */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-              Work Type Breakdown
-            </h3>
-            <div className="space-y-3">
-              {Object.entries(stats.workTypeBreakdown)
-                .sort(([,a], [,b]) => b - a)
-                .map(([type, hours]) => (
-                  <div key={type} className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className={`w-3 h-3 rounded-full ${getTypeColor(type)} mr-3`}></div>
-                      <span className="text-sm font-medium text-gray-900">
-                        {getTypeLabel(type)}
-                      </span>
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {hours.toFixed(1)}h
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-              Recent Activity
-            </h3>
-            <div className="space-y-4">
-              {timesheets.slice(0, 5).map((timesheet) => (
-                <div key={timesheet.id} className="flex items-center space-x-3">
-                  <div className={`w-2 h-2 rounded-full ${getTypeColor(timesheet.type)}`}></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {timesheet.taskName}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {timesheet.project.name} • {formatDate(timesheet.date)}
-                    </p>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {parseFloat(timesheet.hoursWorked).toFixed(1)}h
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Key Insights */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Key Insights
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex items-start space-x-3">
-              <Target className="h-5 w-5 text-blue-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">Most Active Day</p>
-                <p className="text-sm text-gray-500">
-                  {stats.mostActiveDay ? formatDate(stats.mostActiveDay) : 'No data available'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Folder className="h-5 w-5 text-green-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">Top Project</p>
-                <p className="text-sm text-gray-500">
-                  {stats.mostActiveProject || 'No data available'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <button 
-              onClick={() => navigate('/timesheets')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Entry
-            </button>
-            {user?.role === 'ADMIN' && (
-              <button 
-                onClick={() => navigate('/reports')}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                View Reports
-              </button>
-            )}
-            {user?.role === 'ADMIN' && (
-              <button 
-                onClick={() => navigate('/users')}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Manage Users
-              </button>
-            )}
-            <button 
-              onClick={() => navigate('/projects')}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <Folder className="h-4 w-4 mr-2" />
-              Manage Projects
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Custom Analytics Tab */}
+      {activeTab === 'custom' && (
+        <CustomDateRangeAnalytics timesheets={timesheets} />
+      )}
     </div>
   );
 };

@@ -87,11 +87,12 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: get().limit.toString(),
-        ...filters,
-      });
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', get().limit.toString());
+      if (filters.role) params.append('role', filters.role);
+      if (filters.isActive !== undefined) params.append('isActive', filters.isActive.toString());
+      if (filters.search) params.append('search', filters.search);
 
       const response = await fetch(`${API_BASE}/users?${params}`, {
         headers: {

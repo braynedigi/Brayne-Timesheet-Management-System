@@ -34,6 +34,7 @@ const CustomCurrencyManager: React.FC<CustomCurrencyManagerProps> = ({
     symbol: '',
     exchangeRate: 1.0,
     isDefault: false,
+    isActive: true,
   });
 
   useEffect(() => {
@@ -76,6 +77,7 @@ const CustomCurrencyManager: React.FC<CustomCurrencyManagerProps> = ({
       symbol: currency.symbol,
       exchangeRate: currency.exchangeRate,
       isDefault: currency.isDefault,
+      isActive: currency.isActive,
     });
     setShowForm(true);
   };
@@ -107,6 +109,7 @@ const CustomCurrencyManager: React.FC<CustomCurrencyManagerProps> = ({
       symbol: '',
       exchangeRate: 1.0,
       isDefault: false,
+      isActive: true,
     });
   };
 

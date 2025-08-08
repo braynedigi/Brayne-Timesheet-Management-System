@@ -51,6 +51,7 @@ export interface TimesheetFilters {
   type?: string;
   projectId?: string;
   userId?: string;
+  clientId?: string;
 }
 
 interface TimesheetState {

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { BrandingProvider } from '@/contexts/BrandingContext'
 
 // Layouts
 import DashboardLayout from '@/components/layouts/DashboardLayout'
@@ -36,7 +37,8 @@ function App() {
 
   return (
     <ThemeProvider>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <BrandingProvider>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={
@@ -81,7 +83,8 @@ function App() {
           {/* Catch all route */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-      </div>
+        </div>
+      </BrandingProvider>
     </ThemeProvider>
   )
 }

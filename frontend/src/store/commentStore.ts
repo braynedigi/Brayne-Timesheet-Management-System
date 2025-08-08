@@ -1,70 +1,60 @@
 import { create } from 'zustand';
 import { useAuthStore } from './authStore';
 
-export interface Project {
+export interface TaskComment {
   id: string;
-  name: string;
-  description?: string;
-  isActive: boolean;
+  content: string;
   createdAt: string;
   updatedAt: string;
-  client: {
+  taskId: string;
+  userId: string;
+  user: {
     id: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     email: string;
-    phone?: string;
-    address?: string;
-  };
-  _count?: {
-    timesheets: number;
   };
 }
 
-export interface CreateProjectData {
-  name: string;
-  description?: string;
-  clientId: string;
-  isActive?: boolean;
+export interface CreateCommentData {
+  content: string;
+  taskId: string;
 }
 
-export interface UpdateProjectData {
-  name?: string;
-  description?: string;
-  clientId?: string;
-  isActive?: boolean;
+export interface UpdateCommentData {
+  content: string;
 }
 
-interface ProjectState {
-  projects: Project[];
+interface CommentState {
+  comments: TaskComment[];
   isLoading: boolean;
   error: string | null;
 }
 
-interface ProjectActions {
-  fetchProjects: () => Promise<void>;
-  createProject: (data: CreateProjectData) => Promise<void>;
-  updateProject: (id: string, data: UpdateProjectData) => Promise<void>;
-  deleteProject: (id: string) => Promise<void>;
+interface CommentActions {
+  fetchComments: (taskId: string) => Promise<void>;
+  createComment: (data: CreateCommentData) => Promise<void>;
+  updateComment: (id: string, data: UpdateCommentData) => Promise<void>;
+  deleteComment: (id: string) => Promise<void>;
   setError: (error: string | null) => void;
   clearError: () => void;
 }
 
-type ProjectStore = ProjectState & ProjectActions;
+type CommentStore = CommentState & CommentActions;
 
 const API_BASE = 'http://localhost:5000/api';
 
-export const useProjectStore = create<ProjectStore>((set, get) => ({
+export const useCommentStore = create<CommentStore>((set, get) => ({
   // State
-  projects: [],
+  comments: [],
   isLoading: false,
   error: null,
 
   // Actions
-  fetchProjects: async () => {
+  fetchComments: async (taskId: string) => {
     set({ isLoading: true, error: null });
     
     try {
-      // Check and refresh token if needed
       const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
       if (!tokenValid) {
         throw new Error('Authentication required');
@@ -72,7 +62,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`${API_BASE}/projects`, {
+      const response = await fetch(`${API_BASE}/comments/task/${taskId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -82,30 +72,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch projects');
+        throw new Error(data.error || 'Failed to fetch comments');
       }
 
       set({
-        projects: data.data,
+        comments: data.data,
         isLoading: false,
       });
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch projects',
+        error: error instanceof Error ? error.message : 'Failed to fetch comments',
       });
     }
   },
 
-  setError: (error: string | null) => {
-    set({ error });
-  },
-
-  clearError: () => {
-    set({ error: null });
-  },
-
-  createProject: async (data: CreateProjectData) => {
+  createComment: async (data: CreateCommentData) => {
     set({ isLoading: true, error: null });
     
     try {
@@ -116,7 +98,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`${API_BASE}/projects`, {
+      const response = await fetch(`${API_BASE}/comments`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -128,20 +110,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to create project');
+        throw new Error(responseData.error || 'Failed to create comment');
       }
 
-      // Refresh projects list
-      await get().fetchProjects();
+      // Refresh comments list
+      await get().fetchComments(data.taskId);
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to create project',
+        error: error instanceof Error ? error.message : 'Failed to create comment',
       });
     }
   },
 
-  updateProject: async (id: string, data: UpdateProjectData) => {
+  updateComment: async (id: string, data: UpdateCommentData) => {
     set({ isLoading: true, error: null });
     
     try {
@@ -152,7 +134,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`${API_BASE}/projects/${id}`, {
+      const response = await fetch(`${API_BASE}/comments/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -164,20 +146,25 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to update project');
+        throw new Error(responseData.error || 'Failed to update comment');
       }
 
-      // Refresh projects list
-      await get().fetchProjects();
+      // Update the comment in the local state
+      set(state => ({
+        comments: state.comments.map(comment => 
+          comment.id === id ? responseData.data : comment
+        ),
+        isLoading: false,
+      }));
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to update project',
+        error: error instanceof Error ? error.message : 'Failed to update comment',
       });
     }
   },
 
-  deleteProject: async (id: string) => {
+  deleteComment: async (id: string) => {
     set({ isLoading: true, error: null });
     
     try {
@@ -188,25 +175,37 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`${API_BASE}/projects/${id}`, {
+      const response = await fetch(`${API_BASE}/comments/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
       if (!response.ok) {
-        const responseData = await response.json();
-        throw new Error(responseData.error || 'Failed to delete project');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete comment');
       }
 
-      // Refresh projects list
-      await get().fetchProjects();
+      // Remove the comment from the local state
+      set(state => ({
+        comments: state.comments.filter(comment => comment.id !== id),
+        isLoading: false,
+      }));
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to delete project',
+        error: error instanceof Error ? error.message : 'Failed to delete comment',
       });
     }
+  },
+
+  setError: (error: string | null) => {
+    set({ error });
+  },
+
+  clearError: () => {
+    set({ error: null });
   },
 }));

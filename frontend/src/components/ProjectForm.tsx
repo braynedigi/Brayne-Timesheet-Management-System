@@ -17,7 +17,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
   const [formData, setFormData] = useState({
     name: project?.name || '',
     description: project?.description || '',
-    clientId: project?.clientId || '',
+    clientId: project?.client?.id || '',
+    isActive: project?.isActive ?? true,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,13 +35,15 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
       setFormData({
         name: project.name,
         description: project.description || '',
-        clientId: project.clientId,
+        clientId: project.client?.id || '',
+        isActive: project.isActive,
       });
     } else {
       setFormData({
         name: '',
         description: '',
         clientId: '',
+        isActive: true,
       });
     }
     setErrors({});
@@ -72,9 +75,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
 
     try {
       const submitData = {
-        name: formData.name.trim(),
-        description: formData.description.trim() || undefined,
+        name: formData.name,
+        description: formData.description,
         clientId: formData.clientId,
+        isActive: formData.isActive,
       };
 
       await onSubmit(submitData as any);

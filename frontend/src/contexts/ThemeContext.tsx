@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useAuthStore } from '@/store/authStore';
 
 type Theme = 'light' | 'dark' | 'auto';
 
@@ -25,6 +26,7 @@ interface ThemeProviderProps {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const { settings, updateSettings } = useSettingsStore();
+  const { isAuthenticated } = useAuthStore();
   const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>('light');
 
   // Get system preference
@@ -52,7 +54,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   // Set theme and save to settings
   const setTheme = (theme: Theme) => {
-    updateSettings('display', { theme });
+    // Only update settings if user is authenticated
+    if (isAuthenticated) {
+      updateSettings('display', { theme }).catch((error) => {
+        console.warn('Failed to update theme settings:', error);
+      });
+    }
     
     let actualTheme: 'light' | 'dark';
     if (theme === 'auto') {
@@ -64,9 +71,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     applyTheme(actualTheme);
   };
 
+  // Get current theme from settings with fallback
+  const getCurrentTheme = (): Theme => {
+    return settings?.display?.theme || 'light';
+  };
+
   // Initialize theme
   useEffect(() => {
-    const savedTheme = settings.display.theme;
+    const savedTheme = getCurrentTheme();
     let actualTheme: 'light' | 'dark';
     
     if (savedTheme === 'auto') {
@@ -80,7 +92,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   // Listen for system theme changes when auto is selected
   useEffect(() => {
-    if (settings.display.theme !== 'auto') return;
+    const currentTheme = getCurrentTheme();
+    if (currentTheme !== 'auto') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
@@ -90,11 +103,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [settings.display.theme]);
+  }, [settings?.display?.theme]);
 
   // Update theme when settings change
   useEffect(() => {
-    const savedTheme = settings.display.theme;
+    const savedTheme = getCurrentTheme();
     let actualTheme: 'light' | 'dark';
     
     if (savedTheme === 'auto') {
@@ -104,10 +117,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
     
     applyTheme(actualTheme);
-  }, [settings.display.theme]);
+  }, [settings?.display?.theme]);
 
   const value: ThemeContextType = {
-    theme: settings.display.theme,
+    theme: getCurrentTheme(),
     currentTheme,
     setTheme,
   };

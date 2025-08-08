@@ -17,6 +17,9 @@ RUN npm install
 # Copy source code
 COPY . .
 
+# Create uploads directory
+RUN mkdir -p /app/uploads && chmod 755 /app/uploads
+
 # Generate Prisma client
 RUN npx prisma generate
 

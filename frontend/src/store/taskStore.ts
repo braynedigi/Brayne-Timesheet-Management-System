@@ -1,96 +1,105 @@
 import { create } from 'zustand';
 import { useAuthStore } from './authStore';
 
-export interface Client {
+export interface Task {
   id: string;
   name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  isActive: boolean;
+  description?: string;
+  status: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED' | 'CANCELLED';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  estimatedHours?: number;
+  actualHours?: number;
+  dueDate?: string;
+  assignedTo?: string;
   createdAt: string;
   updatedAt: string;
-  _count?: {
-    projects: number;
+  projectId: string;
+  project: {
+    id: string;
+    name: string;
   };
+  comments?: Array<{
+    id: string;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+    userId: string;
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+  }>;
 }
 
-export interface CreateClientData {
+export interface CreateTaskData {
   name: string;
-  email: string;
-  phone?: string;
-  address?: string;
+  description?: string;
+  status?: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED' | 'CANCELLED';
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  estimatedHours?: number;
+  dueDate?: string;
+  assignedTo?: string;
+  projectId: string;
 }
 
-export interface UpdateClientData {
+export interface UpdateTaskData {
   name?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
+  description?: string;
+  status?: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED' | 'CANCELLED';
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  estimatedHours?: number;
+  actualHours?: number;
+  dueDate?: string;
+  assignedTo?: string;
 }
 
-export interface ClientFilters {
-  search?: string;
-  isActive?: boolean;
-}
-
-interface ClientState {
-  clients: Client[];
-  currentClient: Client | null;
+interface TaskState {
+  tasks: Task[];
+  currentTask: Task | null;
   isLoading: boolean;
   error: string | null;
-  total: number;
-  page: number;
-  totalPages: number;
-  limit: number;
 }
 
-interface ClientActions {
-  fetchClients: (filters?: ClientFilters, page?: number) => Promise<void>;
-  createClient: (data: CreateClientData) => Promise<void>;
-  updateClient: (id: string, data: UpdateClientData) => Promise<void>;
-  deleteClient: (id: string) => Promise<void>;
-  getClientById: (id: string) => Promise<void>;
-  clearCurrentClient: () => void;
+interface TaskActions {
+  fetchTasks: (projectId?: string) => Promise<void>;
+  createTask: (data: CreateTaskData) => Promise<void>;
+  updateTask: (id: string, data: UpdateTaskData) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+  getTaskById: (id: string) => Promise<void>;
+  clearCurrentTask: () => void;
   setError: (error: string | null) => void;
   clearError: () => void;
 }
 
-type ClientStore = ClientState & ClientActions;
+type TaskStore = TaskState & TaskActions;
 
 const API_BASE = 'http://localhost:5000/api';
 
-export const useClientStore = create<ClientStore>((set, get) => ({
+export const useTaskStore = create<TaskStore>((set, get) => ({
   // State
-  clients: [],
-  currentClient: null,
+  tasks: [],
+  currentTask: null,
   isLoading: false,
   error: null,
-  total: 0,
-  page: 1,
-  totalPages: 1,
-  limit: 10,
 
   // Actions
-  fetchClients: async (filters = {}, page = 1) => {
+  fetchTasks: async (projectId?: string) => {
     set({ isLoading: true, error: null });
     
     try {
-      // Check and refresh token if needed
       const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
       if (!tokenValid) {
         throw new Error('Authentication required');
       }
 
       const token = useAuthStore.getState().token;
+      const url = projectId 
+        ? `${API_BASE}/tasks?projectId=${projectId}`
+        : `${API_BASE}/tasks`;
 
-      const params = new URLSearchParams();
-      params.append('page', page.toString());
-      params.append('limit', get().limit.toString());
-      if (filters.search) params.append('search', filters.search);
-      if (filters.isActive !== undefined) params.append('isActive', filters.isActive.toString());
-
-      const response = await fetch(`${API_BASE}/clients?${params}`, {
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -100,29 +109,25 @@ export const useClientStore = create<ClientStore>((set, get) => ({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch clients');
+        throw new Error(data.error || 'Failed to fetch tasks');
       }
 
       set({
-        clients: data.data.clients,
-        total: data.data.total,
-        page: data.data.page,
-        totalPages: data.data.totalPages,
+        tasks: data.data,
         isLoading: false,
       });
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch clients',
+        error: error instanceof Error ? error.message : 'Failed to fetch tasks',
       });
     }
   },
 
-  createClient: async (data: CreateClientData) => {
+  createTask: async (data: CreateTaskData) => {
     set({ isLoading: true, error: null });
     
     try {
-      // Check and refresh token if needed
       const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
       if (!tokenValid) {
         throw new Error('Authentication required');
@@ -130,7 +135,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`${API_BASE}/clients`, {
+      const response = await fetch(`${API_BASE}/tasks`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -142,25 +147,23 @@ export const useClientStore = create<ClientStore>((set, get) => ({
       const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to create client');
+        throw new Error(responseData.error || 'Failed to create task');
       }
 
-      // Refresh the clients list
-      await get().fetchClients();
-      set({ isLoading: false });
+      // Refresh tasks list
+      await get().fetchTasks(data.projectId);
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to create client',
+        error: error instanceof Error ? error.message : 'Failed to create task',
       });
     }
   },
 
-  updateClient: async (id: string, data: UpdateClientData) => {
+  updateTask: async (id: string, data: UpdateTaskData) => {
     set({ isLoading: true, error: null });
     
     try {
-      // Check and refresh token if needed
       const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
       if (!tokenValid) {
         throw new Error('Authentication required');
@@ -168,7 +171,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`${API_BASE}/clients/${id}`, {
+      const response = await fetch(`${API_BASE}/tasks/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -180,25 +183,23 @@ export const useClientStore = create<ClientStore>((set, get) => ({
       const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to update client');
+        throw new Error(responseData.error || 'Failed to update task');
       }
 
-      // Refresh the clients list
-      await get().fetchClients();
-      set({ isLoading: false });
+      // Refresh tasks list
+      await get().fetchTasks();
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to update client',
+        error: error instanceof Error ? error.message : 'Failed to update task',
       });
     }
   },
 
-  deleteClient: async (id: string) => {
+  deleteTask: async (id: string) => {
     set({ isLoading: true, error: null });
     
     try {
-      // Check and refresh token if needed
       const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
       if (!tokenValid) {
         throw new Error('Authentication required');
@@ -206,7 +207,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`${API_BASE}/clients/${id}`, {
+      const response = await fetch(`${API_BASE}/tasks/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -215,26 +216,24 @@ export const useClientStore = create<ClientStore>((set, get) => ({
       });
 
       if (!response.ok) {
-        const responseData = await response.json();
-        throw new Error(responseData.error || 'Failed to delete client');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete task');
       }
 
-      // Refresh the clients list
-      await get().fetchClients();
-      set({ isLoading: false });
+      // Refresh tasks list
+      await get().fetchTasks();
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to delete client',
+        error: error instanceof Error ? error.message : 'Failed to delete task',
       });
     }
   },
 
-  getClientById: async (id: string) => {
+  getTaskById: async (id: string) => {
     set({ isLoading: true, error: null });
     
     try {
-      // Check and refresh token if needed
       const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
       if (!tokenValid) {
         throw new Error('Authentication required');
@@ -242,7 +241,7 @@ export const useClientStore = create<ClientStore>((set, get) => ({
 
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`${API_BASE}/clients/${id}`, {
+      const response = await fetch(`${API_BASE}/tasks/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -252,23 +251,23 @@ export const useClientStore = create<ClientStore>((set, get) => ({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch client');
+        throw new Error(data.error || 'Failed to fetch task');
       }
 
       set({
-        currentClient: data.data,
+        currentTask: data.data,
         isLoading: false,
       });
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch client',
+        error: error instanceof Error ? error.message : 'Failed to fetch task',
       });
     }
   },
 
-  clearCurrentClient: () => {
-    set({ currentClient: null });
+  clearCurrentTask: () => {
+    set({ currentTask: null });
   },
 
   setError: (error: string | null) => {

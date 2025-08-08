@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useTimesheetStore, TimesheetFilters } from '@/store/timesheetStore';
 import { useProjectStore } from '@/store/projectStore';
+import { useClientStore } from '@/store/clientStore';
+import { useUserStore } from '@/store/userStore';
 import TimesheetForm from '@/components/TimesheetForm';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNotification } from '@/contexts/NotificationContext';
 import { AnimatedButton } from '@/components/ui/AnimatedButton';
 import { BulkTimeEntry, BulkEntry } from '@/components/ui/BulkTimeEntry';
-import { Plus, Search, Filter, Edit, Trash2, Calendar, Clock, User, Folder, Layers } from 'lucide-react';
+import { exportToPDF, exportToExcel, exportToCSV } from '@/utils/exportUtils';
+import { Plus, Search, Filter, Edit, Trash2, Calendar, Clock, User, Folder, Layers, Building, Download, FileText, FileSpreadsheet } from 'lucide-react';
 
 const TimesheetsPage: React.FC = () => {
   const {
@@ -18,6 +21,7 @@ const TimesheetsPage: React.FC = () => {
     page,
     totalPages,
     fetchTimesheets,
+    createTimesheet,
     deleteTimesheet,
     clearError,
   } = useTimesheetStore();
@@ -26,6 +30,16 @@ const TimesheetsPage: React.FC = () => {
     projects,
     fetchProjects,
   } = useProjectStore();
+
+  const {
+    clients,
+    fetchClients,
+  } = useClientStore();
+
+  const {
+    users,
+    fetchUsers,
+  } = useUserStore();
 
   const [filters, setFilters] = useState<TimesheetFilters>({});
   const [showFilters, setShowFilters] = useState(false);
@@ -48,7 +62,9 @@ const TimesheetsPage: React.FC = () => {
 
   useEffect(() => {
     fetchProjects();
-  }, [fetchProjects]);
+    fetchClients();
+    fetchUsers();
+  }, [fetchProjects, fetchClients, fetchUsers]);
 
   const handleFilterChange = (key: keyof TimesheetFilters, value: string) => {
     setFilters(prev => ({
@@ -96,6 +112,63 @@ const TimesheetsPage: React.FC = () => {
         type: 'error',
         title: 'Bulk Creation Failed',
         message: 'Failed to create some or all timesheet entries.',
+        duration: 5000
+      });
+    }
+  };
+
+  const handleExportPDF = () => {
+    try {
+      exportToPDF(timesheets, filters);
+      showNotification({
+        type: 'success',
+        title: 'PDF Export',
+        message: 'Timesheet report exported to PDF successfully.',
+        duration: 3000
+      });
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: 'Export Failed',
+        message: 'Failed to export timesheet report to PDF.',
+        duration: 5000
+      });
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      exportToExcel(timesheets, filters);
+      showNotification({
+        type: 'success',
+        title: 'Excel Export',
+        message: 'Timesheet report exported to Excel successfully.',
+        duration: 3000
+      });
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: 'Export Failed',
+        message: 'Failed to export timesheet report to Excel.',
+        duration: 5000
+      });
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      exportToCSV(timesheets);
+      showNotification({
+        type: 'success',
+        title: 'CSV Export',
+        message: 'Timesheet report exported to CSV successfully.',
+        duration: 3000
+      });
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: 'Export Failed',
+        message: 'Failed to export timesheet report to CSV.',
         duration: 5000
       });
     }
@@ -180,6 +253,35 @@ const TimesheetsPage: React.FC = () => {
           >
             Bulk Entry
           </AnimatedButton>
+          <div className="flex space-x-1">
+            <button
+              onClick={handleExportPDF}
+              disabled={timesheets.length === 0}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Export to PDF"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              PDF
+            </button>
+            <button
+              onClick={handleExportExcel}
+              disabled={timesheets.length === 0}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Export to Excel"
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel
+            </button>
+            <button
+              onClick={handleExportCSV}
+              disabled={timesheets.length === 0}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Export to CSV"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </button>
+          </div>
         </div>
       </div>
 
@@ -198,7 +300,7 @@ const TimesheetsPage: React.FC = () => {
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Start Date</label>
                 <input
@@ -231,6 +333,36 @@ const TimesheetsPage: React.FC = () => {
                   <option value="TRAINING">Training</option>
                   <option value="BREAK">Break</option>
                   <option value="OTHER">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">User</label>
+                <select
+                  value={filters.userId || ''}
+                  onChange={(e) => handleFilterChange('userId', e.target.value)}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">All Users</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.firstName} {user.lastName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Client</label>
+                <select
+                  value={filters.clientId || ''}
+                  onChange={(e) => handleFilterChange('clientId', e.target.value)}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">All Clients</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

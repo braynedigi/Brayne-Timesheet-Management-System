@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useAuthStore } from './authStore';
 
 export interface SystemSettings {
   branding: {
     softwareName: string;
     logoUrl: string;
+    faviconUrl: string;
     primaryColor: string;
     secondaryColor: string;
     buttonColor: string;
@@ -74,7 +76,10 @@ interface SettingsState {
   settings: SystemSettings;
   isLoading: boolean;
   error: string | null;
-  updateSettings: (section: keyof SystemSettings, updates: Partial<SystemSettings[keyof SystemSettings]>) => void;
+  fetchSettings: () => Promise<void>;
+  updateSettings: (section: keyof SystemSettings, updates: Partial<SystemSettings[keyof SystemSettings]>) => Promise<void>;
+  uploadLogo: (file: File) => Promise<void>;
+  uploadFavicon: (file: File) => Promise<void>;
   resetSettings: () => void;
   setError: (error: string | null) => void;
 }
@@ -83,6 +88,7 @@ const defaultSettings: SystemSettings = {
   branding: {
     softwareName: 'Timesheet Management System',
     logoUrl: '',
+    faviconUrl: '',
     primaryColor: '#3B82F6',
     secondaryColor: '#10B981',
     buttonColor: '#3B82F6',
@@ -91,7 +97,7 @@ const defaultSettings: SystemSettings = {
     textColor: '#1F2937',
     borderRadius: '0.375rem',
     fontFamily: 'Inter',
-    fontSize: '14px',
+    fontSize: '16px',
   },
   footer: {
     enabled: true,
@@ -152,26 +158,149 @@ const defaultSettings: SystemSettings = {
   },
 };
 
+const API_BASE = 'http://localhost:5000/api';
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
       settings: defaultSettings,
       isLoading: false,
       error: null,
-
-      updateSettings: (section, updates) => {
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            [section]: { ...state.settings[section], ...updates }
+      
+      fetchSettings: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
+          if (!tokenValid) {
+            throw new Error('Authentication required');
           }
-        }));
+
+          const token = useAuthStore.getState().token;
+          const response = await fetch(`${API_BASE}/settings`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to fetch settings');
+          }
+
+          set({ settings: data.data, isLoading: false });
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Failed to fetch settings',
+          });
+        }
+      },
+
+      updateSettings: async (section, updates) => {
+        set({ isLoading: true, error: null });
+        try {
+          const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
+          if (!tokenValid) {
+            throw new Error('Authentication required');
+          }
+
+          const token = useAuthStore.getState().token;
+          const response = await fetch(`${API_BASE}/settings/${section}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updates),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to update settings');
+          }
+
+          set({ settings: data.data, isLoading: false });
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Failed to update settings',
+          });
+        }
+      },
+
+      uploadLogo: async (file) => {
+        set({ isLoading: true, error: null });
+        try {
+          const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
+          if (!tokenValid) {
+            throw new Error('Authentication required');
+          }
+
+          const token = useAuthStore.getState().token;
+          const formData = new FormData();
+          formData.append('logo', file);
+
+          const response = await fetch(`${API_BASE}/settings/upload/logo`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to upload logo');
+          }
+
+          set({ settings: data.data.settings, isLoading: false });
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Failed to upload logo',
+          });
+        }
+      },
+
+      uploadFavicon: async (file) => {
+        set({ isLoading: true, error: null });
+        try {
+          const tokenValid = await useAuthStore.getState().checkAndRefreshToken();
+          if (!tokenValid) {
+            throw new Error('Authentication required');
+          }
+
+          const token = useAuthStore.getState().token;
+          const formData = new FormData();
+          formData.append('favicon', file);
+
+          const response = await fetch(`${API_BASE}/settings/upload/favicon`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to upload favicon');
+          }
+
+          set({ settings: data.data.settings, isLoading: false });
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Failed to upload favicon',
+          });
+        }
       },
 
       resetSettings: () => {
         set({ settings: defaultSettings });
       },
-
+      
       setError: (error) => {
         set({ error });
       },
