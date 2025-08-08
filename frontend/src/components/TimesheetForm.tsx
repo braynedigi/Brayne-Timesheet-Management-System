@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X, Calendar, Clock, FileText, User, Building } from 'lucide-react';
+import { X, Calendar, Clock, FileText, User, Building, Play, Pause, Square } from 'lucide-react';
 import { useTimesheetStore, CreateTimesheetData } from '@/store/timesheetStore';
+import { Timer } from '@/components/ui/Timer';
+import { useNotification } from '@/contexts/NotificationContext';
 
 const timesheetSchema = z.object({
   date: z.string().min(1, 'Date is required'),
@@ -35,7 +37,10 @@ interface TimesheetFormProps {
 
 const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects = [] }) => {
   const { createTimesheet, isLoading, error, clearError } = useTimesheetStore();
+  const { showNotification } = useNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
+  const [trackedTime, setTrackedTime] = useState(0);
 
   const {
     register,
@@ -61,13 +66,37 @@ const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects
   const onSubmit = async (data: TimesheetFormData) => {
     setIsSubmitting(true);
     try {
-      await createTimesheet(data);
+      // Use tracked time if available, otherwise use form hours
+      const finalData = {
+        ...data,
+        hours: trackedTime > 0 ? trackedTime / 3600 : data.hours
+      };
+      await createTimesheet(finalData);
+      
+      showNotification({
+        type: 'success',
+        title: 'Timesheet Entry Created',
+        message: `Successfully logged ${finalData.hours.toFixed(2)} hours for ${data.taskName}`,
+        duration: 3000
+      });
+      
       onClose();
+      setTrackedTime(0);
+      setShowTimer(false);
     } catch (error) {
-      // Error is handled by the store
+      showNotification({
+        type: 'error',
+        title: 'Failed to Create Timesheet',
+        message: error instanceof Error ? error.message : 'An unexpected error occurred',
+        duration: 5000
+      });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleTimerComplete = (totalTime: number) => {
+    setTrackedTime(totalTime);
   };
 
   if (!isOpen) return null;
@@ -112,21 +141,55 @@ const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects
               )}
             </div>
 
-            {/* Hours */}
+            {/* Hours with Timer */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Clock className="inline h-4 w-4 mr-1" />
-                Hours
-              </label>
-              <input
-                {...register('hours', { valueAsNumber: true })}
-                type="number"
-                step="0.5"
-                min="0.1"
-                max="24"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="8.0"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  <Clock className="inline h-4 w-4 mr-1" />
+                  Hours
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowTimer(!showTimer)}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                >
+                  {showTimer ? (
+                    <>
+                      <Square className="h-4 w-4 mr-1" />
+                      Hide Timer
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-1" />
+                      Use Timer
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              {showTimer ? (
+                <div className="mb-4">
+                  <Timer 
+                    onComplete={handleTimerComplete}
+                    className="mb-3"
+                  />
+                  {trackedTime > 0 && (
+                    <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                      Tracked: {(trackedTime / 3600).toFixed(2)} hours
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <input
+                  {...register('hours', { valueAsNumber: true })}
+                  type="number"
+                  step="0.5"
+                  min="0.1"
+                  max="24"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="8.0"
+                />
+              )}
               {errors.hours && (
                 <p className="mt-1 text-sm text-red-600">{errors.hours.message}</p>
               )}

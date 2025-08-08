@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useTimesheetStore, TimesheetFilters } from '@/store/timesheetStore';
 import { useProjectStore } from '@/store/projectStore';
 import TimesheetForm from '@/components/TimesheetForm';
+import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useNotification } from '@/contexts/NotificationContext';
+import { AnimatedButton } from '@/components/ui/AnimatedButton';
 import { Plus, Search, Filter, Edit, Trash2, Calendar, Clock, User, Folder } from 'lucide-react';
 
 const TimesheetsPage: React.FC = () => {
@@ -25,6 +29,13 @@ const TimesheetsPage: React.FC = () => {
   const [filters, setFilters] = useState<TimesheetFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const { showNotification } = useNotification();
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onAddTimesheet: () => setShowForm(true),
+    onEscape: () => setShowForm(false)
+  });
 
   useEffect(() => {
     fetchTimesheets(filters, page);
@@ -43,7 +54,22 @@ const TimesheetsPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this timesheet entry?')) {
-      await deleteTimesheet(id);
+      try {
+        await deleteTimesheet(id);
+        showNotification({
+          type: 'success',
+          title: 'Timesheet Deleted',
+          message: 'The timesheet entry has been successfully deleted.',
+          duration: 3000
+        });
+      } catch (error) {
+        showNotification({
+          type: 'error',
+          title: 'Delete Failed',
+          message: 'Failed to delete the timesheet entry.',
+          duration: 5000
+        });
+      }
     }
   };
 
@@ -67,6 +93,14 @@ const TimesheetsPage: React.FC = () => {
     };
     return colors[type as keyof typeof colors] || colors.OTHER;
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <LoadingSkeleton type="table" rows={5} />
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -103,13 +137,13 @@ const TimesheetsPage: React.FC = () => {
             Manage your timesheet entries and track your work hours.
           </p>
         </div>
-        <button 
+                <AnimatedButton
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          icon={Plus}
+          variant="primary"
         >
-          <Plus className="h-4 w-4 mr-2" />
           Add Entry
-        </button>
+        </AnimatedButton>
       </div>
 
       {/* Filters */}

@@ -3,9 +3,10 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useNotificationStore } from '@/store/notificationStore';
-import { LogOut, Menu, X, Settings, Bell } from 'lucide-react';
+import { LogOut, Menu, X, Settings, Bell, Keyboard } from 'lucide-react';
 import Footer from './Footer';
 import NotificationsPanel from '../NotificationsPanel';
+import { KeyboardShortcutsHelp } from '../ui/KeyboardShortcutsHelp';
 
 const DashboardLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -15,6 +16,7 @@ const DashboardLayout: React.FC = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
 
   const handleLogout = () => {
     logout();
@@ -128,6 +130,15 @@ const DashboardLayout: React.FC = () => {
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1" />
             <div className="flex items-center gap-x-4 lg:gap-x-6">
+              {/* Keyboard Shortcuts */}
+              <button
+                onClick={() => setShortcutsOpen(true)}
+                className="p-2 text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                title="Keyboard Shortcuts"
+              >
+                <Keyboard className="h-5 w-5" />
+              </button>
+
               {/* Notifications */}
               <button
                 onClick={() => setNotificationsOpen(true)}
@@ -177,6 +188,12 @@ const DashboardLayout: React.FC = () => {
       <NotificationsPanel 
         isOpen={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
+      />
+
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsHelp
+        isOpen={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
       />
     </div>
   );

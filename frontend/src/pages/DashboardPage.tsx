@@ -16,6 +16,7 @@ import {
   Settings
 } from 'lucide-react';
 import DashboardCharts from '@/components/dashboard/DashboardCharts';
+import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 
 const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
@@ -116,8 +117,9 @@ const DashboardPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="space-y-6">
+        <LoadingSkeleton type="card" rows={4} />
+        <LoadingSkeleton type="chart" />
       </div>
     );
   }
