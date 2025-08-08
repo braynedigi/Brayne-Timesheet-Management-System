@@ -1,0 +1,41 @@
+{
+  "name": "timesheet-management-system",
+  "version": "1.0.0",
+  "description": "A comprehensive timesheet management system with role-based access control",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "docker-compose up --build",
+    "dev:detached": "docker-compose up -d --build",
+    "stop": "docker-compose down",
+    "stop:volumes": "docker-compose down -v",
+    "logs": "docker-compose logs -f",
+    "logs:frontend": "docker-compose logs -f frontend",
+    "logs:backend": "docker-compose logs -f backend",
+    "logs:postgres": "docker-compose logs -f postgres",
+    "build": "docker-compose build",
+    "clean": "docker-compose down -v && docker system prune -f",
+    "db:migrate": "docker-compose exec backend npx prisma migrate dev",
+    "db:generate": "docker-compose exec backend npx prisma generate",
+    "db:studio": "docker-compose exec backend npx prisma studio",
+    "db:seed": "docker-compose exec backend npm run db:seed",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "timesheet",
+    "management",
+    "react",
+    "nodejs",
+    "postgresql",
+    "typescript",
+    "docker"
+  ],
+  "author": "Your Company",
+  "license": "MIT"
+}

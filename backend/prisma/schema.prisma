@@ -1,0 +1,228 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+  CLIENT
+}
+
+enum TimesheetType {
+  WORK
+  MEETING
+  RESEARCH
+  TRAINING
+  BREAK
+  OTHER
+}
+
+enum NotificationType {
+  EMAIL
+  PUSH
+  SMS
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+model CustomCurrency {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g., "USD", "EUR", "CUSTOM1"
+  name        String   // e.g., "US Dollar", "Euro", "Custom Currency 1"
+  symbol      String   // e.g., "$", "€", "₿"
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  exchangeRate Decimal @db.Decimal(10, 6) @default(1.000000) // Rate relative to USD
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userPreferences UserPreferences[]
+
+  @@index([userId])
+  @@index([code])
+  @@map("custom_currencies")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      UserRole @default(EMPLOYEE)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  timesheets       Timesheet[]
+  employeeRate     EmployeeRate?
+  preferences      UserPreferences?
+  notifications    Notification[]
+  customCurrencies CustomCurrency[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Client {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  projects Project[]
+
+  @@map("clients")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  clientId    String
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  timesheets  Timesheet[]
+
+  @@index([clientId])
+  @@map("projects")
+}
+
+model Timesheet {
+  id          String        @id @default(cuid())
+  taskName    String
+  hoursWorked Decimal       @db.Decimal(4, 2) // Allows up to 99.99 hours
+  date        DateTime
+  type        TimesheetType @default(WORK)
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relationships
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([date])
+  @@index([userId, date])
+  @@map("timesheets")
+}
+
+model EmployeeRate {
+  id         String   @id @default(cuid())
+  hourlyRate Decimal  @db.Decimal(8, 2) // Allows up to 999,999.99
+  effectiveDate DateTime @default(now())
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([effectiveDate])
+  @@map("employee_rates")
+}
+
+model UserPreferences {
+  id        String   @id @default(cuid())
+  
+  // Display preferences
+  theme     String   @default("light") // light, dark, auto
+  language  String   @default("en")
+  timezone  String   @default("UTC")
+  dateFormat String  @default("MM/DD/YYYY")
+  timeFormat String  @default("12h")
+  currency  String   @default("USD")
+  customCurrencyId String? // Reference to custom currency
+  numberFormat String @default("1,234.56")
+  compactMode Boolean @default(false)
+  showAnimations Boolean @default(true)
+  sidebarCollapsed Boolean @default(false)
+  
+  // Notification preferences
+  emailNotifications Boolean @default(true)
+  pushNotifications Boolean @default(false)
+  timesheetReminders Boolean @default(true)
+  weeklyReports Boolean @default(false)
+  dailyDigest Boolean @default(false)
+  projectUpdates Boolean @default(true)
+  clientNotifications Boolean @default(true)
+  reminderTime String @default("09:00")
+  reminderDays String[] @default(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+  
+  // Security preferences
+  sessionTimeout Int @default(30)
+  requirePasswordChange Boolean @default(false)
+  twoFactorAuth Boolean @default(false)
+  
+  // Custom preferences (stored as JSON)
+  customSettings Json? @default("{}")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customCurrency CustomCurrency? @relation(fields: [customCurrencyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([customCurrencyId])
+  @@map("user_preferences")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      NotificationType
+  status    NotificationStatus @default(PENDING)
+  data      Json? // Additional data for the notification
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notifications")
+}
