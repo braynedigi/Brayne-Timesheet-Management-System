@@ -1,203 +1,252 @@
-# Timesheet Management System
+# Brayne Timesheet Management System
 
-A comprehensive timesheet management system with role-based access control for companies managing multiple clients and projects.
+A modern, full-stack timesheet management system built with React, Node.js, and PostgreSQL. Features include user authentication, project management, time tracking, reporting, and customizable settings.
 
-## 🎯 Features
+## 🚀 Features
 
-### Core Functionality
-- **Timesheet Entries**: Track task name, hours worked, date, type, and project
-- **Multi-Client Support**: Manage multiple clients with multiple projects each
-- **Role-Based Access**: Admin, Employee, and Client roles with appropriate permissions
-- **Advanced Filtering**: Filter by date range, client, project, and employee
-- **Export Capabilities**: CSV and PDF exports for reports and invoicing
+- **User Management**: Admin, Employee, and Client roles with different permissions
+- **Time Tracking**: Easy timesheet entry with project and task management
+- **Project Management**: Create and manage projects with client assignments
+- **Reporting**: Comprehensive analytics and reporting dashboard
+- **Customization**: Branding, notifications, and system settings
+- **Multi-currency Support**: Custom currency management
+- **Email Integration**: Configurable email notifications
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark/Light Theme**: User preference support
 
-### Dashboards
-- **Admin Dashboard**: Full system management, user management, reports
-- **Employee Dashboard**: Personal timesheet management
-- **Client Dashboard**: Project-specific timesheet viewing
+## 🛠️ Tech Stack
 
-### Security
-- JWT-based authentication with refresh tokens
-- Role-based route protection
-- Secure API endpoints
-- Input validation and sanitization
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** for styling
+- **Zustand** for state management
+- **React Router** for navigation
+- **React Query** for data fetching
+- **Lucide React** for icons
 
-## 🏗️ Architecture
+### Backend
+- **Node.js** with TypeScript
+- **Express.js** framework
+- **Prisma** ORM for database management
+- **PostgreSQL** database
+- **JWT** for authentication
+- **bcrypt** for password hashing
+- **Nodemailer** for email functionality
 
-```
-├── frontend/          # React + TypeScript + Tailwind CSS
-├── backend/           # Node.js + Express + Prisma
-├── database/          # PostgreSQL data and init scripts
-└── docker-compose.yml # Local development setup
-```
+### Infrastructure
+- **Docker** containerization
+- **Docker Compose** for local development
+- **Individual Dockerfiles** for VPS deployment
 
-## 🚀 Quick Start with Docker
+## 📋 Prerequisites
 
-### Prerequisites
-- Docker and Docker Compose installed
-- Node.js 18+ (for local development without Docker)
+- Node.js 18+ 
+- Docker and Docker Compose (for containerized deployment)
+- PostgreSQL (if running without Docker)
 
-### Installation
+## 🚀 Quick Start
+
+### Option 1: Docker Compose (Recommended for Development)
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd timesheet-management-system
+   git clone https://github.com/braynedigi/Brayne-Timesheet-Management-System.git
+   cd Brayne-Timesheet-Management-System
    ```
 
-2. **Start all services**
+2. **Start the application**
    ```bash
-   npm run dev
+   # Windows
+   .\start.bat
+   
+   # Linux/Mac
+   ./start.sh
    ```
-   This will:
-   - Build and start PostgreSQL database
-   - Build and start the backend API
-   - Build and start the frontend React app
-   - Set up all necessary networks and volumes
 
 3. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:5000
    - API Documentation: http://localhost:5000/api/docs
 
-### Docker Commands
+### Option 2: VPS Deployment (Production)
 
-```bash
-# Start all services
-npm run dev
+For VPS deployment without Docker Compose, see [VPS_DEPLOYMENT.md](./VPS_DEPLOYMENT.md)
 
-# Start in detached mode
-npm run dev:detached
+## 🔐 Default Login Credentials
 
-# Stop all services
-npm run stop
+- **Admin**: admin@example.com / password123
+- **Employee**: employee@example.com / password123
+- **Client**: client@example.com / password123
 
-# Stop and remove volumes
-npm run stop:volumes
+## 📁 Project Structure
 
-# View logs
-npm run logs
-
-# View specific service logs
-npm run logs:frontend
-npm run logs:backend
-npm run logs:postgres
-
-# Clean up everything
-npm run clean
-
-# Database operations
-npm run db:migrate    # Run Prisma migrations
-npm run db:generate   # Generate Prisma client
-npm run db:studio     # Open Prisma Studio
-npm run db:seed       # Seed database with test data
+```
+├── backend/                 # Backend API server
+│   ├── src/
+│   │   ├── routes/         # API routes
+│   │   ├── services/       # Business logic
+│   │   ├── middleware/     # Express middleware
+│   │   └── scripts/        # Database scripts
+│   ├── prisma/             # Database schema and migrations
+│   └── Dockerfile          # Backend container
+├── frontend/               # React frontend application
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── pages/          # Page components
+│   │   ├── store/          # Zustand stores
+│   │   └── contexts/       # React contexts
+│   └── Dockerfile          # Frontend container
+├── database/               # Database initialization
+├── docker-compose.yml      # Development environment
+├── start-vps.sh           # VPS deployment script
+└── VPS_DEPLOYMENT.md      # VPS deployment guide
 ```
 
-## 📊 Database Schema
+## 🔧 Development
 
-### Core Entities
-- **Users**: Admin, Employee, Client roles
-- **Clients**: Company clients
-- **Projects**: Sub-projects under clients
-- **Timesheets**: Time entries with task details
-- **EmployeeRates**: Internal hourly rates (admin only)
+### Backend Development
 
-### Relationships
-- Client → Projects (1:many)
-- Project → Timesheets (1:many)
-- User → Timesheets (1:many)
-- User → EmployeeRates (1:1, employees only)
-
-## 🔐 Authentication & Authorization
-
-### Roles & Permissions
-
-| Role | Can View | Can Edit | Access Level |
-|------|----------|----------|--------------|
-| **Admin** | All data | All data | Full system access |
-| **Employee** | Own timesheets | Own timesheets | Personal data only |
-| **Client** | Project timesheets | View only | Project-specific data |
-
-### Protected Routes
-- `/admin/*` - Admin only
-- `/employee/*` - Employee only  
-- `/client/*` - Client only
-- `/api/rates` - Admin only
-
-## 🛠️ Development
-
-### Local Development (without Docker)
 ```bash
-# Install dependencies
-npm run install:all
-
-# Start backend
 cd backend
+npm install
 npm run dev
+```
 
-# Start frontend (in another terminal)
+### Frontend Development
+
+```bash
 cd frontend
-npm start
+npm install
+npm run dev
 ```
 
 ### Database Management
-```bash
-# Using Docker
-npm run db:migrate
-npm run db:studio
 
-# Or directly
-docker-compose exec backend npx prisma studio
+```bash
+# Generate Prisma client
+cd backend
+npx prisma generate
+
+# Run migrations
+npx prisma migrate dev
+
+# Seed database
+npm run db:seed
 ```
 
-## 📝 API Documentation
+## 🐳 Docker Commands
 
-The API documentation is available at `/api/docs` when running the backend server.
+### Development
+```bash
+# Start all services
+docker-compose up -d
 
-### Key Endpoints
-- `POST /api/auth/login` - User authentication
-- `GET /api/timesheets` - Get timesheets (filtered by role)
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+### Production (VPS)
+```bash
+# Build and start services
+./start-vps.sh
+
+# View logs
+docker logs timesheet-frontend
+docker logs timesheet-backend
+docker logs timesheet-postgres
+
+# Stop services
+docker stop timesheet-frontend timesheet-backend timesheet-postgres
+```
+
+## 📊 API Endpoints
+
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/refresh` - Refresh token
+- `POST /api/auth/logout` - User logout
+
+### Users
+- `GET /api/users` - Get all users (Admin only)
+- `POST /api/users` - Create user (Admin only)
+- `PUT /api/users/:id` - Update user
+- `DELETE /api/users/:id` - Delete user (Admin only)
+
+### Projects
+- `GET /api/projects` - Get all projects
+- `POST /api/projects` - Create project
+- `PUT /api/projects/:id` - Update project
+- `DELETE /api/projects/:id` - Delete project
+
+### Timesheets
+- `GET /api/timesheets` - Get timesheets
 - `POST /api/timesheets` - Create timesheet entry
-- `GET /api/clients` - Get clients (admin only)
-- `GET /api/projects` - Get projects
-- `GET /api/rates` - Get employee rates (admin only)
+- `PUT /api/timesheets/:id` - Update timesheet
+- `DELETE /api/timesheets/:id` - Delete timesheet
 
-## 🧪 Testing
+### Clients
+- `GET /api/clients` - Get all clients
+- `POST /api/clients` - Create client
+- `PUT /api/clients/:id` - Update client
+- `DELETE /api/clients/:id` - Delete client
 
-```bash
-# Run backend tests
-docker-compose exec backend npm test
+## 🔒 Security Features
 
-# Run frontend tests
-docker-compose exec frontend npm test
-```
+- JWT-based authentication
+- Role-based access control
+- Password hashing with bcrypt
+- Input validation and sanitization
+- CORS protection
+- Rate limiting (configurable)
 
-## 📦 Production Deployment
+## 🎨 Customization
 
-### VPS Deployment
-1. Copy the project to your VPS
-2. Update environment variables for production
-3. Use production Dockerfiles
-4. Set up reverse proxy (Nginx)
-5. Configure SSL certificates
+The system supports extensive customization:
 
-### Environment Variables
-Create `.env` files for production:
-- `backend/.env.production`
-- `frontend/.env.production`
+- **Branding**: Logo, colors, company name
+- **Notifications**: Email and push notifications
+- **Currencies**: Custom currency management
+- **User Preferences**: Theme, language, timezone
+- **System Settings**: Backup, maintenance mode, logging
+
+## 📈 Reporting & Analytics
+
+- Time tracking analytics
+- Project performance metrics
+- User productivity reports
+- Client billing reports
+- Export functionality (CSV, PDF)
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📄 License
+## 📝 License
 
-MIT License - see LICENSE file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
-For support and questions, please contact the development team.
+For support and questions:
+- Create an issue on GitHub
+- Check the [VPS_DEPLOYMENT.md](./VPS_DEPLOYMENT.md) for deployment help
+- Review the API documentation at http://localhost:5000/api/docs
+
+## 🔄 Updates
+
+- **Prisma**: Update available from 5.22.0 to 6.13.0
+- **Dependencies**: Regular security updates recommended
+- **Features**: New features added regularly
+
+---
+
+**Built with ❤️ by Brayne Digital**
