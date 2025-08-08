@@ -1,22 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, Square, RotateCcw } from 'lucide-react';
+import { Play, Pause, Square, RotateCcw, AlertTriangle } from 'lucide-react';
 
 interface TimerProps {
   onTimeUpdate?: (time: number) => void;
   onComplete?: (totalTime: number) => void;
   autoStart?: boolean;
   className?: string;
+  idleDetection?: boolean;
+  idleTimeout?: number; // in seconds
 }
 
 export const Timer: React.FC<TimerProps> = ({
   onTimeUpdate,
   onComplete,
   autoStart = false,
-  className = ''
+  className = '',
+  idleDetection = true,
+  idleTimeout = 300 // 5 minutes default
 }) => {
   const [isRunning, setIsRunning] = useState(autoStart);
   const [time, setTime] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
+  const [isIdle, setIsIdle] = useState(false);
+  const [lastActivity, setLastActivity] = useState(Date.now());
 
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -45,7 +51,44 @@ export const Timer: React.FC<TimerProps> = ({
     setIsRunning(false);
     setTime(0);
     setTotalTime(0);
+    setIsIdle(false);
+    setLastActivity(Date.now());
   }, []);
+
+  // Idle detection
+  useEffect(() => {
+    if (!idleDetection || !isRunning) return;
+
+    const handleActivity = () => {
+      setLastActivity(Date.now());
+      setIsIdle(false);
+    };
+
+    const checkIdle = () => {
+      const now = Date.now();
+      const idleTime = now - lastActivity;
+      
+      if (idleTime > idleTimeout * 1000) {
+        setIsIdle(true);
+      }
+    };
+
+    // Add event listeners for user activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    // Check for idle every 30 seconds
+    const idleInterval = setInterval(checkIdle, 30000);
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+      clearInterval(idleInterval);
+    };
+  }, [idleDetection, isRunning, lastActivity, idleTimeout]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -77,6 +120,17 @@ export const Timer: React.FC<TimerProps> = ({
         {totalTime > 0 && (
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Total: {formatTime(totalTime)}
+          </div>
+        )}
+
+        {isIdle && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3 mb-4">
+            <div className="flex items-center">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 mr-2" />
+              <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                Timer paused - no activity detected
+              </span>
+            </div>
           </div>
         )}
 

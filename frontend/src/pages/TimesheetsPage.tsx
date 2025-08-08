@@ -6,7 +6,8 @@ import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNotification } from '@/contexts/NotificationContext';
 import { AnimatedButton } from '@/components/ui/AnimatedButton';
-import { Plus, Search, Filter, Edit, Trash2, Calendar, Clock, User, Folder } from 'lucide-react';
+import { BulkTimeEntry, BulkEntry } from '@/components/ui/BulkTimeEntry';
+import { Plus, Search, Filter, Edit, Trash2, Calendar, Clock, User, Folder, Layers } from 'lucide-react';
 
 const TimesheetsPage: React.FC = () => {
   const {
@@ -29,12 +30,16 @@ const TimesheetsPage: React.FC = () => {
   const [filters, setFilters] = useState<TimesheetFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showBulkForm, setShowBulkForm] = useState(false);
   const { showNotification } = useNotification();
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onAddTimesheet: () => setShowForm(true),
-    onEscape: () => setShowForm(false)
+    onEscape: () => {
+      setShowForm(false);
+      setShowBulkForm(false);
+    }
   });
 
   useEffect(() => {
@@ -70,6 +75,29 @@ const TimesheetsPage: React.FC = () => {
           duration: 5000
         });
       }
+    }
+  };
+
+  const handleBulkSubmit = async (entries: BulkEntry[]) => {
+    try {
+      // Create all entries sequentially
+      for (const entry of entries) {
+        await createTimesheet(entry);
+      }
+      
+      showNotification({
+        type: 'success',
+        title: 'Bulk Entries Created',
+        message: `Successfully created ${entries.length} timesheet entries.`,
+        duration: 3000
+      });
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: 'Bulk Creation Failed',
+        message: 'Failed to create some or all timesheet entries.',
+        duration: 5000
+      });
     }
   };
 
@@ -137,13 +165,22 @@ const TimesheetsPage: React.FC = () => {
             Manage your timesheet entries and track your work hours.
           </p>
         </div>
-                <AnimatedButton
-          onClick={() => setShowForm(true)}
-          icon={Plus}
-          variant="primary"
-        >
-          Add Entry
-        </AnimatedButton>
+                <div className="flex space-x-2">
+          <AnimatedButton
+            onClick={() => setShowForm(true)}
+            icon={Plus}
+            variant="primary"
+          >
+            Add Entry
+          </AnimatedButton>
+          <AnimatedButton
+            onClick={() => setShowBulkForm(true)}
+            icon={Layers}
+            variant="secondary"
+          >
+            Bulk Entry
+          </AnimatedButton>
+        </div>
       </div>
 
       {/* Filters */}
@@ -362,6 +399,14 @@ const TimesheetsPage: React.FC = () => {
         isOpen={showForm}
         onClose={() => setShowForm(false)}
         projects={projects}
+      />
+
+      {/* Bulk Time Entry Modal */}
+      <BulkTimeEntry
+        isOpen={showBulkForm}
+        onClose={() => setShowBulkForm(false)}
+        projects={projects}
+        onSubmit={handleBulkSubmit}
       />
     </div>
   );

@@ -6,6 +6,9 @@ import { X, Calendar, Clock, FileText, User, Building, Play, Pause, Square } fro
 import { useTimesheetStore, CreateTimesheetData } from '@/store/timesheetStore';
 import { Timer } from '@/components/ui/Timer';
 import { useNotification } from '@/contexts/NotificationContext';
+import { useAutoSave } from '@/hooks/useAutoSave';
+import { SmartSuggestions } from '@/components/ui/SmartSuggestions';
+import { roundTime, formatHours } from '@/utils/timeUtils';
 
 const timesheetSchema = z.object({
   date: z.string().min(1, 'Date is required'),
@@ -36,16 +39,24 @@ interface TimesheetFormProps {
 }
 
 const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects = [] }) => {
-  const { createTimesheet, isLoading, error, clearError } = useTimesheetStore();
+  const { createTimesheet, isLoading, error, clearError, timesheets } = useTimesheetStore();
   const { showNotification } = useNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
   const [trackedTime, setTrackedTime] = useState(0);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [timeRounding, setTimeRounding] = useState({
+    enabled: false,
+    interval: 0.5 as const,
+    method: 'nearest' as const
+  });
 
   const {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<TimesheetFormData>({
     resolver: zodResolver(timesheetSchema),
@@ -54,6 +65,26 @@ const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects
       hours: 8,
       type: 'WORK',
     },
+  });
+
+  const watchedValues = watch();
+  
+  // Auto-save functionality
+  const { clearAutoSave } = useAutoSave({
+    key: 'timesheet-form',
+    data: watchedValues,
+    enabled: isOpen,
+    onRestore: (data) => {
+      Object.entries(data).forEach(([key, value]) => {
+        setValue(key as keyof TimesheetFormData, value);
+      });
+      showNotification({
+        type: 'info',
+        title: 'Form Restored',
+        message: 'Your previous form data has been restored.',
+        duration: 3000
+      });
+    }
   });
 
   useEffect(() => {
@@ -67,22 +98,34 @@ const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects
     setIsSubmitting(true);
     try {
       // Use tracked time if available, otherwise use form hours
+      let finalHours = trackedTime > 0 ? trackedTime / 3600 : data.hours;
+      
+      // Apply time rounding if enabled
+      if (timeRounding.enabled) {
+        finalHours = roundTime(finalHours, {
+          interval: timeRounding.interval,
+          method: timeRounding.method
+        });
+      }
+      
       const finalData = {
         ...data,
-        hours: trackedTime > 0 ? trackedTime / 3600 : data.hours
+        hours: finalHours
       };
+      
       await createTimesheet(finalData);
       
       showNotification({
         type: 'success',
         title: 'Timesheet Entry Created',
-        message: `Successfully logged ${finalData.hours.toFixed(2)} hours for ${data.taskName}`,
+        message: `Successfully logged ${formatHours(finalHours)} for ${data.taskName}`,
         duration: 3000
       });
       
       onClose();
       setTrackedTime(0);
       setShowTimer(false);
+      clearAutoSave(); // Clear auto-saved data after successful submission
     } catch (error) {
       showNotification({
         type: 'error',
@@ -93,6 +136,12 @@ const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleTaskSuggestion = (taskName: string, hours: number) => {
+    setValue('taskName', taskName);
+    setValue('hours', hours);
+    setShowSuggestions(false);
   };
 
   const handleTimerComplete = (totalTime: number) => {
@@ -195,8 +244,8 @@ const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects
               )}
             </div>
 
-            {/* Task Name */}
-            <div>
+            {/* Task Name with Smart Suggestions */}
+            <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 <FileText className="inline h-4 w-4 mr-1" />
                 Task Name
@@ -206,10 +255,22 @@ const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects
                 type="text"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="e.g., Development work, Client meeting"
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               />
               {errors.taskName && (
                 <p className="mt-1 text-sm text-red-600">{errors.taskName.message}</p>
               )}
+              
+              <SmartSuggestions
+                taskName={watchedValues.taskName || ''}
+                onTaskSelect={handleTaskSuggestion}
+                previousEntries={timesheets.map(ts => ({
+                  taskName: ts.taskName,
+                  hours: parseFloat(ts.hoursWorked)
+                }))}
+                visible={showSuggestions}
+              />
             </div>
 
             {/* Description */}
@@ -265,6 +326,62 @@ const TimesheetForm: React.FC<TimesheetFormProps> = ({ isOpen, onClose, projects
               </select>
               {errors.projectId && (
                 <p className="mt-1 text-sm text-red-600">{errors.projectId.message}</p>
+              )}
+            </div>
+
+            {/* Time Rounding Options */}
+            <div className="bg-gray-50 p-3 rounded-md">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Time Rounding
+                </label>
+                <input
+                  type="checkbox"
+                  checked={timeRounding.enabled}
+                  onChange={(e) => setTimeRounding(prev => ({ ...prev, enabled: e.target.checked }))}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+              </div>
+              
+              {timeRounding.enabled && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Interval
+                    </label>
+                    <select
+                      value={timeRounding.interval}
+                      onChange={(e) => setTimeRounding(prev => ({ 
+                        ...prev, 
+                        interval: parseFloat(e.target.value) as 0.25 | 0.5 | 1 | 1.5 | 2 
+                      }))}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                    >
+                      <option value={0.25}>15 minutes</option>
+                      <option value={0.5}>30 minutes</option>
+                      <option value={1}>1 hour</option>
+                      <option value={1.5}>1.5 hours</option>
+                      <option value={2}>2 hours</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Method
+                    </label>
+                    <select
+                      value={timeRounding.method}
+                      onChange={(e) => setTimeRounding(prev => ({ 
+                        ...prev, 
+                        method: e.target.value as 'nearest' | 'up' | 'down' 
+                      }))}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                    >
+                      <option value="nearest">Nearest</option>
+                      <option value="up">Round up</option>
+                      <option value="down">Round down</option>
+                    </select>
+                  </div>
+                </div>
               )}
             </div>
 
