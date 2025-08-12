@@ -5,6 +5,10 @@ export interface Project {
   id: string;
   name: string;
   description?: string;
+  category?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -24,6 +28,10 @@ export interface CreateProjectData {
   name: string;
   description?: string;
   clientId: string;
+  category?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
   isActive?: boolean;
 }
 
@@ -31,6 +39,10 @@ export interface UpdateProjectData {
   name?: string;
   description?: string;
   clientId?: string;
+  category?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
   isActive?: boolean;
 }
 

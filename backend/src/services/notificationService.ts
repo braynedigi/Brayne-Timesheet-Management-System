@@ -48,15 +48,36 @@ export class NotificationService {
     try {
       const skip = (page - 1) * limit;
       
+      // Filter out test notifications and only show real notifications
       const [notifications, total] = await Promise.all([
         prisma.notification.findMany({
-          where: { userId },
+          where: { 
+            userId,
+            // Exclude test notifications
+            NOT: {
+              OR: [
+                { title: 'Test Notification' },
+                { title: { startsWith: 'Test ' } },
+                { message: { startsWith: 'This is a test' } }
+              ]
+            }
+          },
           orderBy: { createdAt: 'desc' },
           skip,
           take: limit,
         }),
         prisma.notification.count({
-          where: { userId },
+          where: { 
+            userId,
+            // Exclude test notifications from count
+            NOT: {
+              OR: [
+                { title: 'Test Notification' },
+                { title: { startsWith: 'Test ' } },
+                { message: { startsWith: 'This is a test' } }
+              ]
+            }
+          },
         }),
       ]);
 
@@ -79,6 +100,14 @@ export class NotificationService {
         where: {
           userId,
           status: { not: NotificationStatus.READ },
+          // Exclude test notifications from unread count
+          NOT: {
+            OR: [
+              { title: 'Test Notification' },
+              { title: { startsWith: 'Test ' } },
+              { message: { startsWith: 'This is a test' } }
+            ]
+          }
         },
       });
       return count;
@@ -212,6 +241,32 @@ export class NotificationService {
     } catch (error) {
       console.error('Error sending email notification:', error);
       throw new Error('Failed to send email notification');
+    }
+  }
+
+  // Send in-app notification
+  static async sendInAppNotification(userId: string, title: string, message: string, data?: any): Promise<Notification> {
+    try {
+      const notification = await this.createNotification(userId, {
+        title,
+        message,
+        type: NotificationType.IN_APP,
+        data,
+      });
+
+      // Update notification status to sent
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data: {
+          status: NotificationStatus.SENT,
+          sentAt: new Date(),
+        },
+      });
+
+      return notification;
+    } catch (error) {
+      console.error('Error sending in-app notification:', error);
+      throw new Error('Failed to send in-app notification');
     }
   }
 

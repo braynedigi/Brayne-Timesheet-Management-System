@@ -116,21 +116,21 @@ router.post('/send-welcome-email', authenticateToken, requireRole(['ADMIN']), as
 });
 
 // Get email templates
-router.get('/templates', authenticateToken, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const templates = await EmailConfigService.getTemplates();
-    
-    res.json({
-      success: true,
-      data: templates,
-    });
-  } catch (error) {
-    console.error('Error fetching email templates:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch email templates',
-    });
-  }
-});
+// router.get('/templates', authenticateToken, requireRole(['ADMIN']), async (req, res) => {
+//   try {
+//     const templates = await EmailConfigService.getTemplates();
+//     
+//     res.json({
+//       success: true,
+//       data: templates,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching email templates:', error);
+//     res.status(500).json({
+//       success: false,
+//       error: 'Failed to fetch email templates',
+//     });
+//   }
+// });
 
 export default router;

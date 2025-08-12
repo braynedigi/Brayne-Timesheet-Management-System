@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNotificationStore } from '@/store/notificationStore';
 import { useAuthStore } from '@/store/authStore';
+import { useNavigate } from 'react-router-dom';
 import { 
   Bell, 
   X, 
@@ -12,7 +13,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 
 interface NotificationsPanelProps {
@@ -22,6 +24,7 @@ interface NotificationsPanelProps {
 
 const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose }) => {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const {
     notifications,
     unreadCount,
@@ -61,6 +64,30 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose
 
   const handleDelete = async (notificationId: string) => {
     await deleteNotification(notificationId);
+  };
+
+  const handleNotificationClick = (notification: any) => {
+    // Mark as read first
+    if (notification.status !== 'READ') {
+      handleMarkAsRead(notification.id);
+    }
+
+    // Navigate based on notification type and data
+    if (notification.data?.type === 'mention' && notification.data?.taskId) {
+      // Navigate to the task with comments expanded and scroll to the specific comment
+      navigate(`/projects?task=${notification.data.taskId}&comment=${notification.data.commentId}&scroll=true`);
+      onClose();
+    } else if (notification.data?.taskId) {
+      // Navigate to the task
+      navigate(`/projects?task=${notification.data.taskId}`);
+      onClose();
+    } else if (notification.data?.projectId) {
+      // Navigate to the project
+      navigate(`/projects?project=${notification.data.projectId}`);
+      onClose();
+    }
+    // For other notification types, just close the panel
+    onClose();
   };
 
   const handleSendTest = async () => {
@@ -210,9 +237,10 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
                       notification.status !== 'READ' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`}
+                    onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0">
@@ -236,17 +264,31 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose
                           {notification.message}
                         </p>
                         
+                        {/* Navigation Info */}
+                        {(notification.data?.type === 'mention' || notification.data?.taskId || notification.data?.projectId) && (
+                          <div className="flex items-center space-x-1 mt-2 text-xs text-blue-600 dark:text-blue-400">
+                            <ExternalLink className="h-3 w-3" />
+                            <span>Click to view</span>
+                          </div>
+                        )}
+                        
                         <div className="flex items-center space-x-2 mt-2">
                           {notification.status !== 'READ' && (
                             <button
-                              onClick={() => handleMarkAsRead(notification.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(notification.id);
+                              }}
                               className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                             >
                               Mark as read
                             </button>
                           )}
                           <button
-                            onClick={() => handleDelete(notification.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(notification.id);
+                            }}
                             className="text-xs text-red-600 dark:text-red-400 hover:underline"
                           >
                             Delete

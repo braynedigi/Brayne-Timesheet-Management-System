@@ -1,4 +1,4 @@
-import { PrismaClient, Project } from '@prisma/client';
+import { PrismaClient, Project, ProjectStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -6,12 +6,22 @@ export interface CreateProjectData {
   name: string;
   description?: string;
   clientId: string;
+  category?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateProjectData {
   name?: string;
   description?: string;
   clientId?: string;
+  category?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  isActive?: boolean;
 }
 
 export class ProjectService {
@@ -43,6 +53,11 @@ export class ProjectService {
         name: data.name,
         description: data.description,
         clientId: data.clientId,
+        category: data.category || 'DEV',
+        status: (data.status as ProjectStatus) || 'TODO',
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        isActive: data.isActive ?? true,
       },
       include: {
         client: true,
@@ -132,9 +147,21 @@ export class ProjectService {
       }
     }
 
+    // Create update data object with only defined fields
+    const updateData: any = {};
+    
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.clientId !== undefined) updateData.clientId = data.clientId;
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;
+    if (data.endDate !== undefined) updateData.endDate = data.endDate ? new Date(data.endDate) : null;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
     return prisma.project.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         client: true,
       },

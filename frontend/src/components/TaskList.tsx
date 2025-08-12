@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Task, useTaskStore } from '@/store/taskStore';
 import { useUserStore } from '@/store/userStore';
-import TaskForm from './TaskForm';
 import TaskComments from './TaskComments';
+import TaskDetailsModal from './TaskDetailsModal';
 import { 
-  Plus, 
-  Edit, 
   Trash2, 
   Calendar, 
   Clock, 
@@ -15,51 +13,71 @@ import {
   AlertCircle,
   Flag,
   MoreHorizontal,
-  MessageSquare
+  MessageSquare,
+  Edit
 } from 'lucide-react';
 
 interface TaskListProps {
   projectId: string;
   projectName: string;
+  highlightCommentId?: string | null;
+  commentScrollRef?: React.RefObject<HTMLDivElement>;
+  onEditTask?: (task: Task) => void;
 }
 
-const TaskList: React.FC<TaskListProps> = ({ projectId, projectName }) => {
-  const { tasks, fetchTasks, createTask, updateTask, deleteTask, isLoading } = useTaskStore();
+const TaskList: React.FC<TaskListProps> = ({ projectId, projectName, highlightCommentId, commentScrollRef, onEditTask }) => {
+  const { tasks, fetchTasks, deleteTask, isLoading } = useTaskStore();
   const { users, fetchUsers } = useUserStore();
   
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTasks(projectId);
     fetchUsers();
   }, [projectId, fetchTasks, fetchUsers]);
 
-  const handleCreateTask = async (data: any) => {
-    await createTask(data);
-    setShowTaskForm(false);
-  };
-
-  const handleUpdateTask = async (data: any) => {
-    if (editingTask) {
-      await updateTask(editingTask.id, data);
-      setEditingTask(null);
-      setShowTaskForm(false);
+  // Auto-expand comments if we're highlighting a specific comment
+  useEffect(() => {
+    if (highlightCommentId && tasks.length > 0) {
+      // Find the task that contains the highlighted comment
+      // We'll need to check all tasks since the comment might not be loaded yet
+      let taskWithComment = tasks.find(task => 
+        task.comments?.some(comment => comment.id === highlightCommentId)
+      );
+      
+      // If we can't find it in the loaded comments, check if we can find it by task ID from URL
+      if (!taskWithComment) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const taskId = urlParams.get('task');
+        if (taskId) {
+          taskWithComment = tasks.find(task => task.id === taskId);
+        }
+      }
+      
+      if (taskWithComment) {
+        setExpandedComments(taskWithComment.id);
+        
+        // Scroll to the task after expanding comments
+        setTimeout(() => {
+          const taskElement = document.querySelector(`[data-task-id="${taskWithComment.id}"]`);
+          if (taskElement) {
+            taskElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+          }
+        }, 300);
+      }
     }
-  };
+  }, [highlightCommentId, tasks]);
 
   const handleDeleteTask = async (taskId: string) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
       await deleteTask(taskId);
     }
-  };
-
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task);
-    setShowTaskForm(true);
   };
 
   const getStatusIcon = (status: string) => {
@@ -104,10 +122,21 @@ const TaskList: React.FC<TaskListProps> = ({ projectId, projectName }) => {
     }
   };
 
-  const getAssignedUserName = (userId?: string) => {
-    if (!userId) return 'Unassigned';
-    const user = users.find(u => u.id === userId);
-    return user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
+  const getAssignedUserName = (assignedTo?: string[]) => {
+    if (!assignedTo || assignedTo.length === 0) return 'Unassigned';
+    if (assignedTo.length === 1) {
+      const user = users.find(u => u.id === assignedTo[0]);
+      return user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
+    }
+    return `${assignedTo.length} users assigned`;
+  };
+
+  const getAssignedUsersList = (assignedTo?: string[]) => {
+    if (!assignedTo || assignedTo.length === 0) return [];
+    return assignedTo.map(userId => {
+      const user = users.find(u => u.id === userId);
+      return user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
+    });
   };
 
   const formatDate = (dateString?: string) => {
@@ -143,13 +172,6 @@ const TaskList: React.FC<TaskListProps> = ({ projectId, projectName }) => {
           <h3 className="text-lg font-medium text-gray-900">Tasks for {projectName}</h3>
           <p className="text-sm text-gray-500">Manage and track project tasks</p>
         </div>
-        <button
-          onClick={() => setShowTaskForm(true)}
-          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Task
-        </button>
       </div>
 
       {/* Task Statistics */}
@@ -227,22 +249,22 @@ const TaskList: React.FC<TaskListProps> = ({ projectId, projectName }) => {
             <Circle className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No tasks</h3>
             <p className="mt-1 text-sm text-gray-500">
-              Get started by creating a new task.
+              Get started by creating a new task using the "New Task" button above.
             </p>
-            <div className="mt-6">
-              <button
-                onClick={() => setShowTaskForm(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Task
-              </button>
-            </div>
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
             {filteredTasks.map((task) => (
-              <div key={task.id} className="p-6 hover:bg-gray-50">
+              <div 
+                key={task.id} 
+                data-task-id={task.id}
+                className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50"
+                onClick={(e) => {
+                  if (!(e.target as HTMLElement).closest('button')) {
+                    setSelectedTaskId(task.id);
+                  }
+                }}
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3">
@@ -266,7 +288,18 @@ const TaskList: React.FC<TaskListProps> = ({ projectId, projectName }) => {
                     <div className="mt-3 flex items-center space-x-6 text-sm text-gray-500">
                       <div className="flex items-center space-x-1">
                         <User className="h-4 w-4" />
-                        <span>{getAssignedUserName(task.assignedTo)}</span>
+                        <div className="relative group">
+                          <span className="cursor-help">{getAssignedUserName(task.assignedTo)}</span>
+                          {task.assignedTo && task.assignedTo.length > 1 && (
+                            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-2 px-3 whitespace-nowrap z-10">
+                              <div className="font-medium mb-1">Assigned to:</div>
+                              {getAssignedUsersList(task.assignedTo).map((userName, index) => (
+                                <div key={index}>• {userName}</div>
+                              ))}
+                              <div className="absolute top-full left-0 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       {task.estimatedHours && (
                         <div className="flex items-center space-x-1">
@@ -290,14 +323,19 @@ const TaskList: React.FC<TaskListProps> = ({ projectId, projectName }) => {
                       title="View comments"
                     >
                       <MessageSquare className="h-4 w-4" />
-                      <span className="text-xs">{task.comments?.length || 0}</span>
+                      <span className="text-xs">{task.commentCount || 0}</span>
                     </button>
-                    <button
-                      onClick={() => handleEditTask(task)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
+
+                    {onEditTask && (
+                      <button
+                        onClick={() => onEditTask(task)}
+                        className="text-gray-400 hover:text-blue-600"
+                        title="Edit task"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                    )}
+
                     <button
                       onClick={() => handleDeleteTask(task.id)}
                       className="text-gray-400 hover:text-red-600"
@@ -313,6 +351,8 @@ const TaskList: React.FC<TaskListProps> = ({ projectId, projectName }) => {
                     <TaskComments 
                       taskId={task.id} 
                       taskName={task.name} 
+                      highlightCommentId={highlightCommentId}
+                      commentScrollRef={commentScrollRef}
                     />
                   </div>
                 )}
@@ -322,19 +362,18 @@ const TaskList: React.FC<TaskListProps> = ({ projectId, projectName }) => {
         )}
       </div>
 
-      {/* Task Form Modal */}
-      {showTaskForm && (
-        <TaskForm
-          task={editingTask || undefined}
-          projectId={projectId}
-          isOpen={showTaskForm}
-          onClose={() => {
-            setShowTaskForm(false);
-            setEditingTask(null);
+      {selectedTaskId && (
+        <TaskDetailsModal
+          taskId={selectedTaskId}
+          isOpen={!!selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+          onEdit={(task) => {
+            if (onEditTask) onEditTask(task);
+            setSelectedTaskId(null);
           }}
-          onSubmit={editingTask ? handleUpdateTask : handleCreateTask}
         />
       )}
+
     </div>
   );
 };

@@ -10,7 +10,7 @@ export interface CreateTaskData {
   estimatedHours?: number;
   actualHours?: number;
   dueDate?: Date;
-  assignedTo?: string;
+  assignedTo?: string[];
   projectId: string;
 }
 
@@ -22,18 +22,18 @@ export interface UpdateTaskData {
   estimatedHours?: number;
   actualHours?: number;
   dueDate?: Date;
-  assignedTo?: string;
+  assignedTo?: string[];
 }
 
 export interface TaskFilters {
   projectId?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
-  assignedTo?: string;
+  assignedTo?: string[];
 }
 
 export class TaskService {
-  static async getTasks(filters: TaskFilters = {}): Promise<Task[]> {
+  static async getTasks(filters: TaskFilters = {}): Promise<any[]> {
     const where: any = {};
 
     if (filters.projectId) {
@@ -48,11 +48,7 @@ export class TaskService {
       where.priority = filters.priority;
     }
 
-    if (filters.assignedTo) {
-      where.assignedTo = filters.assignedTo;
-    }
-
-    return await prisma.task.findMany({
+    const tasks = await prisma.task.findMany({
       where,
       include: {
         project: {
@@ -61,30 +57,25 @@ export class TaskService {
           },
         },
         timesheets: true,
-        comments: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
+        assignments: true,
+        _count: {
+          select: { comments: true }
+        }
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
+
+    return tasks.map(({ assignments, _count, ...task }) => ({
+      ...task,
+      assignedTo: assignments.map(a => a.userId),
+      commentCount: _count.comments
+    }));
   }
 
-  static async getTaskById(id: string): Promise<Task | null> {
-    return await prisma.task.findUnique({
+  static async getTaskById(id: string): Promise<any | null> {
+    const task = await prisma.task.findUnique({
       where: { id },
       include: {
         project: {
@@ -97,11 +88,24 @@ export class TaskService {
             user: true,
           },
         },
+        assignments: true,
+        _count: {
+          select: { comments: true }
+        }
       },
     });
+
+    if (!task) return null;
+
+    const { assignments, _count, ...rest } = task;
+    return {
+      ...rest,
+      assignedTo: assignments.map(a => a.userId),
+      commentCount: _count.comments
+    };
   }
 
-  static async createTask(data: CreateTaskData): Promise<Task> {
+  static async createTask(data: CreateTaskData): Promise<any> {
     // Verify project exists
     const project = await prisma.project.findUnique({
       where: { id: data.projectId },
@@ -111,28 +115,13 @@ export class TaskService {
       throw new Error('Project not found');
     }
 
-    // Verify assigned user exists if provided
-    if (data.assignedTo) {
-      const user = await prisma.user.findUnique({
-        where: { id: data.assignedTo },
-      });
+    const { assignedTo, ...taskData } = data;
 
-      if (!user) {
-        throw new Error('Assigned user not found');
-      }
-    }
-
-    return await prisma.task.create({
+    const task = await prisma.task.create({
       data: {
-        name: data.name,
-        description: data.description,
-        status: data.status || 'TODO',
-        priority: data.priority || 'MEDIUM',
-        estimatedHours: data.estimatedHours,
-        actualHours: data.actualHours,
-        dueDate: data.dueDate,
-        assignedTo: data.assignedTo,
-        projectId: data.projectId,
+        ...taskData,
+        status: taskData.status || 'TODO',
+        priority: taskData.priority || 'MEDIUM',
       },
       include: {
         project: {
@@ -140,11 +129,50 @@ export class TaskService {
             client: true,
           },
         },
+        assignments: true,
+        _count: {
+          select: { comments: true }
+        }
       },
     });
+
+    if (assignedTo && assignedTo.length > 0) {
+      await prisma.taskAssignment.createMany({
+        data: assignedTo.map(userId => ({
+          taskId: task.id,
+          userId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Refresh the task to include new assignments
+    const updatedTask = await prisma.task.findUnique({
+      where: { id: task.id },
+      include: {
+        project: {
+          include: {
+            client: true,
+          },
+        },
+        assignments: true,
+        _count: {
+          select: { comments: true }
+        }
+      },
+    });
+
+    if (!updatedTask) throw new Error('Failed to fetch updated task');
+
+    const { assignments, _count, ...rest } = updatedTask;
+    return {
+      ...rest,
+      assignedTo: assignments.map(a => a.userId),
+      commentCount: _count.comments
+    };
   }
 
-  static async updateTask(id: string, data: UpdateTaskData): Promise<Task> {
+  static async updateTask(id: string, data: UpdateTaskData): Promise<any> {
     // Verify task exists
     const existingTask = await prisma.task.findUnique({
       where: { id },
@@ -154,28 +182,48 @@ export class TaskService {
       throw new Error('Task not found');
     }
 
-    // Verify assigned user exists if provided
-    if (data.assignedTo) {
-      const user = await prisma.user.findUnique({
-        where: { id: data.assignedTo },
-      });
+    const { assignedTo, ...updateData } = data;
 
-      if (!user) {
-        throw new Error('Assigned user not found');
-      }
-    }
-
-    return await prisma.task.update({
+    const task = await prisma.task.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         project: {
           include: {
             client: true,
           },
         },
+        assignments: true,
+        _count: {
+          select: { comments: true }
+        }
       },
     });
+
+    if (assignedTo !== undefined) {
+      // Delete existing assignments
+      await prisma.taskAssignment.deleteMany({
+        where: { taskId: id },
+      });
+
+      // Create new assignments if provided
+      if (assignedTo.length > 0) {
+        await prisma.taskAssignment.createMany({
+          data: assignedTo.map(userId => ({
+            taskId: id,
+            userId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    const { assignments, _count, ...rest } = task;
+    return {
+      ...rest,
+      assignedTo: assignments.map(a => a.userId),
+      commentCount: _count.comments
+    };
   }
 
   static async deleteTask(id: string): Promise<void> {
@@ -193,8 +241,8 @@ export class TaskService {
     });
   }
 
-  static async getTasksByProject(projectId: string): Promise<Task[]> {
-    return await prisma.task.findMany({
+  static async getTasksByProject(projectId: string): Promise<any[]> {
+    const tasks = await prisma.task.findMany({
       where: { projectId },
       include: {
         project: {
@@ -203,26 +251,21 @@ export class TaskService {
           },
         },
         timesheets: true,
-        comments: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
+        assignments: true,
+        _count: {
+          select: { comments: true }
+        }
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
+
+    return tasks.map(({ assignments, _count, ...task }) => ({
+      ...task,
+      assignedTo: assignments.map(a => a.userId),
+      commentCount: _count.comments
+    }));
   }
 
   static async getTaskStatistics(projectId?: string) {

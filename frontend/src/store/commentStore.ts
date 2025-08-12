@@ -14,6 +14,15 @@ export interface TaskComment {
     lastName: string;
     email: string;
   };
+  mentions?: {
+    id: string;
+    mentionedUser: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+  }[];
 }
 
 export interface CreateCommentData {
@@ -25,22 +34,19 @@ export interface UpdateCommentData {
   content: string;
 }
 
-interface CommentState {
+export interface CommentStore {
+  // State
   comments: TaskComment[];
   isLoading: boolean;
   error: string | null;
-}
 
-interface CommentActions {
+  // Actions
   fetchComments: (taskId: string) => Promise<void>;
   createComment: (data: CreateCommentData) => Promise<void>;
   updateComment: (id: string, data: UpdateCommentData) => Promise<void>;
   deleteComment: (id: string) => Promise<void>;
-  setError: (error: string | null) => void;
   clearError: () => void;
 }
-
-type CommentStore = CommentState & CommentActions;
 
 const API_BASE = 'http://localhost:5000/api';
 

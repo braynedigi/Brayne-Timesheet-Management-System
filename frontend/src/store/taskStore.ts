@@ -10,7 +10,7 @@ export interface Task {
   estimatedHours?: number;
   actualHours?: number;
   dueDate?: string;
-  assignedTo?: string;
+  assignedTo?: string[];
   createdAt: string;
   updatedAt: string;
   projectId: string;
@@ -18,6 +18,16 @@ export interface Task {
     id: string;
     name: string;
   };
+  assignments?: Array<{
+    id: string;
+    userId: string;
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+  }>;
   comments?: Array<{
     id: string;
     content: string;
@@ -31,6 +41,7 @@ export interface Task {
       email: string;
     };
   }>;
+  commentCount?: number;
 }
 
 export interface CreateTaskData {
@@ -40,7 +51,7 @@ export interface CreateTaskData {
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   estimatedHours?: number;
   dueDate?: string;
-  assignedTo?: string;
+  assignedTo?: string[];
   projectId: string;
 }
 
@@ -52,7 +63,7 @@ export interface UpdateTaskData {
   estimatedHours?: number;
   actualHours?: number;
   dueDate?: string;
-  assignedTo?: string;
+  assignedTo?: string[];
 }
 
 interface TaskState {

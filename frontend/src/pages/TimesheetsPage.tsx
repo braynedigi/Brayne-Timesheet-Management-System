@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useTimesheetStore, TimesheetFilters } from '@/store/timesheetStore';
 import { useProjectStore } from '@/store/projectStore';
 import { useClientStore } from '@/store/clientStore';
 import { useUserStore } from '@/store/userStore';
+import { useAuthStore } from '@/store/authStore';
 import TimesheetForm from '@/components/TimesheetForm';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -10,9 +11,12 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { AnimatedButton } from '@/components/ui/AnimatedButton';
 import { BulkTimeEntry, BulkEntry } from '@/components/ui/BulkTimeEntry';
 import { exportToPDF, exportToExcel, exportToCSV } from '@/utils/exportUtils';
-import { Plus, Search, Filter, Edit, Trash2, Calendar, Clock, User, Folder, Layers, Building, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { Plus, Filter, Edit, Trash2, Folder, Layers, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 const TimesheetsPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const { user: currentUser } = useAuthStore();
   const {
     timesheets,
     isLoading,
@@ -47,6 +51,22 @@ const TimesheetsPage: React.FC = () => {
   const [showBulkForm, setShowBulkForm] = useState(false);
   const { showNotification } = useNotification();
 
+  // Filter clients based on user's projects (employees only see clients they work with)
+  const filteredClients = useMemo(() => {
+    if (currentUser?.role === 'ADMIN') {
+      return clients; // Admin sees all clients
+    }
+    
+    // Employees only see clients from their projects
+    const userProjectClientIds = new Set(
+      projects
+        .filter(project => timesheets.some(ts => ts.project.id === project.id))
+        .map(project => project.client.id)
+    );
+    
+    return clients.filter(client => userProjectClientIds.has(client.id));
+  }, [clients, projects, timesheets, currentUser?.role]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onAddTimesheet: () => setShowForm(true),
@@ -60,11 +80,28 @@ const TimesheetsPage: React.FC = () => {
     fetchTimesheets(filters, page);
   }, [filters, page, fetchTimesheets]);
 
+  // Auto-set user filter for employees (they can only see their own timesheets)
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'ADMIN' && !filters.userId) {
+      setFilters(prev => ({
+        ...prev,
+        userId: currentUser.id
+      }));
+    }
+  }, [currentUser, filters.userId]);
+
   useEffect(() => {
     fetchProjects();
     fetchClients();
     fetchUsers();
   }, [fetchProjects, fetchClients, fetchUsers]);
+
+  // Auto-open form if 'new' parameter is present in URL
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setShowForm(true);
+    }
+  }, [searchParams]);
 
   const handleFilterChange = (key: keyof TimesheetFilters, value: string) => {
     setFilters(prev => ({
@@ -341,14 +378,30 @@ const TimesheetsPage: React.FC = () => {
                   value={filters.userId || ''}
                   onChange={(e) => handleFilterChange('userId', e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  disabled={currentUser?.role !== 'ADMIN'}
                 >
                   <option value="">All Users</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.firstName} {user.lastName}
-                    </option>
-                  ))}
+                  {currentUser?.role === 'ADMIN' ? (
+                    // Admin can see all users
+                    users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName}
+                      </option>
+                    ))
+                  ) : (
+                    // Employee only sees their own user info
+                    currentUser && (
+                      <option value={currentUser.id}>
+                        {currentUser.firstName} {currentUser.lastName}
+                      </option>
+                    )
+                  )}
                 </select>
+                {currentUser?.role !== 'ADMIN' && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    You can only view your own timesheets
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Client</label>
@@ -358,12 +411,17 @@ const TimesheetsPage: React.FC = () => {
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">All Clients</option>
-                  {clients.map((client) => (
+                  {filteredClients.map((client) => (
                     <option key={client.id} value={client.id}>
                       {client.name}
                     </option>
                   ))}
                 </select>
+                {currentUser?.role !== 'ADMIN' && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Only clients from your projects are shown
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Project</label>

@@ -18,6 +18,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
     name: project?.name || '',
     description: project?.description || '',
     clientId: project?.client?.id || '',
+    category: project?.category || 'DEV',
+    status: project?.status || 'TODO',
+    startDate: project?.startDate ? project.startDate.split('T')[0] : '',
+    endDate: project?.endDate ? project.endDate.split('T')[0] : '',
     isActive: project?.isActive ?? true,
   });
 
@@ -36,6 +40,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
         name: project.name,
         description: project.description || '',
         clientId: project.client?.id || '',
+        category: project.category || 'DEV',
+        status: project.status || 'TODO',
+        startDate: project.startDate ? project.startDate.split('T')[0] : '',
+        endDate: project.endDate ? project.endDate.split('T')[0] : '',
         isActive: project.isActive,
       });
     } else {
@@ -43,6 +51,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
         name: '',
         description: '',
         clientId: '',
+        category: 'DEV',
+        status: 'TODO',
+        startDate: '',
+        endDate: '',
         isActive: true,
       });
     }
@@ -78,8 +90,14 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
         name: formData.name,
         description: formData.description,
         clientId: formData.clientId,
+        category: formData.category,
+        status: formData.status,
+        startDate: formData.startDate || undefined,
+        endDate: formData.endDate || undefined,
         isActive: formData.isActive,
       };
+
+      console.log('Submitting project data:', submitData);
 
       await onSubmit(submitData as any);
       onClose();
@@ -102,7 +120,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+      <div className="relative top-20 mx-auto p-5 border w-[800px] max-w-[90vw] shadow-lg rounded-md bg-white">
         <div className="mt-3">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-gray-900">
@@ -117,6 +135,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Project Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -176,6 +195,101 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, isOpen, onClose, onS
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter project description (optional)"
               />
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Categories
+              </label>
+              <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-md p-3">
+                {[
+                  { value: 'DEV', label: 'Development' },
+                  { value: 'SEO', label: 'SEO' },
+                  { value: 'AI', label: 'AI' },
+                  { value: 'SOCIAL_MEDIA', label: 'Social Media' },
+                  { value: 'GRAPHICS', label: 'Graphics' },
+                  { value: 'ADMIN', label: 'Admin' }
+                ].map((category) => (
+                  <label key={category.value} className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.category?.includes(category.value) || false}
+                      onChange={(e) => {
+                        const currentCategories = formData.category?.split(',').filter(Boolean) || [];
+                        let newCategories;
+                        
+                        if (e.target.checked) {
+                          newCategories = [...currentCategories, category.value];
+                        } else {
+                          newCategories = currentCategories.filter(cat => cat !== category.value);
+                        }
+                        
+                        console.log('Category change:', {
+                          checked: e.target.checked,
+                          category: category.value,
+                          currentCategories,
+                          newCategories,
+                          finalString: newCategories.join(',')
+                        });
+                        
+                        handleInputChange('category', newCategories.join(','));
+                      }}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm text-gray-700">{category.label}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Select one or more categories</p>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => handleInputChange('status', e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="TODO">To Do</option>
+                <option value="DOING">Doing</option>
+                <option value="WAITING_FOR_APPROVAL">Waiting for Approval</option>
+                <option value="STALLED">Stalled</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="WAITING_ON_CLIENT">Waiting on Client</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
+            </div>
+
+            {/* Start Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => handleInputChange('startDate', e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* End Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => handleInputChange('endDate', e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
             </div>
 
             {/* Submit Error */}

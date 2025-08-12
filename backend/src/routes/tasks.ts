@@ -14,7 +14,7 @@ const createTaskSchema = z.object({
   estimatedHours: z.number().min(0).optional(),
   actualHours: z.number().min(0).optional(),
   dueDate: z.string().transform((str) => new Date(str)).optional(),
-  assignedTo: z.string().optional(),
+  assignedTo: z.array(z.string()).optional(),
   projectId: z.string().min(1, 'Project is required'),
 });
 
@@ -26,14 +26,14 @@ const updateTaskSchema = z.object({
   estimatedHours: z.number().min(0).optional(),
   actualHours: z.number().min(0).optional(),
   dueDate: z.string().transform((str) => new Date(str)).optional(),
-  assignedTo: z.string().optional(),
+  assignedTo: z.array(z.string()).optional(),
 });
 
 const taskFiltersSchema = z.object({
   projectId: z.string().optional(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'CANCELLED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
-  assignedTo: z.string().optional(),
+  assignedTo: z.array(z.string()).optional(),
 });
 
 // GET /api/tasks - Get tasks with filters
@@ -120,16 +120,24 @@ router.post('/', authenticateToken, requireEmployee, async (req, res) => {
 router.put('/:id', authenticateToken, requireEmployee, async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('PUT /api/tasks/:id - Request body:', req.body);
+    console.log('PUT /api/tasks/:id - Task ID:', id);
+    
     const validatedData = updateTaskSchema.parse(req.body);
+    console.log('PUT /api/tasks/:id - Validated data:', validatedData);
     
     const task = await TaskService.updateTask(id, validatedData);
+    console.log('PUT /api/tasks/:id - Updated task:', task);
 
     return res.json({
       success: true,
       data: task,
     });
   } catch (error) {
+    console.error('PUT /api/tasks/:id - Error:', error);
+    
     if (error instanceof z.ZodError) {
+      console.error('PUT /api/tasks/:id - Validation errors:', error.errors);
       return res.status(400).json({
         success: false,
         error: 'Validation error',

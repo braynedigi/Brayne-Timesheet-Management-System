@@ -32,9 +32,8 @@ const userFiltersSchema = z.object({
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
-router.use(requireAdmin);
 
-// GET /api/users - Get all users with filters and pagination
+// GET /api/users - Get all users with filters and pagination (allow authenticated users for mentions)
 router.get('/', async (req, res) => {
   try {
     const filters = userFiltersSchema.parse(req.query);
@@ -63,7 +62,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/users/:id - Get user by ID
+// GET /api/users/:id - Get user by ID (allow authenticated users for mentions)
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -81,8 +80,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/users - Create new user
-router.post('/', async (req, res) => {
+// POST /api/users - Create new user (admin only)
+router.post('/', requireAdmin, async (req, res) => {
   try {
     const data = createUserSchema.parse(req.body);
     const user = await UserService.createUser(data);
@@ -107,8 +106,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/users/:id - Update user
-router.put('/:id', async (req, res) => {
+// PUT /api/users/:id - Update user (admin only)
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const data = updateUserSchema.parse(req.body);
@@ -134,8 +133,8 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id - Delete user
-router.delete('/:id', async (req, res) => {
+// DELETE /api/users/:id - Delete user (admin only)
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     await UserService.deleteUser(id);
@@ -152,8 +151,8 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// GET /api/users/:id/stats - Get user statistics
-router.get('/:id/stats', async (req, res) => {
+// GET /api/users/:id/stats - Get user statistics (admin only)
+router.get('/:id/stats', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const stats = await UserService.getUserStats(id);

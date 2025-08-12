@@ -75,9 +75,9 @@ For VPS deployment without Docker Compose, see [VPS_DEPLOYMENT.md](./VPS_DEPLOYM
 
 ## 🔐 Default Login Credentials
 
-- **Admin**: admin@example.com / password123
-- **Employee**: employee@example.com / password123
-- **Client**: client@example.com / password123
+- **Admin**: admin@timesheet.com / admin123
+- **Employee**: employee@timesheet.com / employee123
+- **Client**: client@timesheet.com / client123
 
 ## 📁 Project Structure
 

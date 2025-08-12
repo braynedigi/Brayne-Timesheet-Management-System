@@ -1,4 +1,5 @@
 import { PrismaClient, TaskComment } from '@prisma/client';
+import { UserMentionService } from './userMentionService';
 
 const prisma = new PrismaClient();
 
@@ -13,6 +14,7 @@ export interface UpdateCommentData {
 }
 
 export class CommentService {
+  // Get all comments for a task
   static async getTaskComments(taskId: string): Promise<TaskComment[]> {
     return await prisma.taskComment.findMany({
       where: { taskId },
@@ -25,13 +27,24 @@ export class CommentService {
             email: true,
           },
         },
+        mentions: {
+          include: {
+            mentionedUser: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: {
-        createdAt: 'asc',
-      },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
+  // Get a single comment by ID
   static async getCommentById(id: string): Promise<TaskComment | null> {
     return await prisma.taskComment.findUnique({
       where: { id },
@@ -44,10 +57,16 @@ export class CommentService {
             email: true,
           },
         },
-        task: {
-          select: {
-            id: true,
-            name: true,
+        mentions: {
+          include: {
+            mentionedUser: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
           },
         },
       },
@@ -58,6 +77,13 @@ export class CommentService {
     // Verify task exists
     const task = await prisma.task.findUnique({
       where: { id: data.taskId },
+      include: {
+        project: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
 
     if (!task) {
@@ -73,7 +99,8 @@ export class CommentService {
       throw new Error('User not found');
     }
 
-    return await prisma.taskComment.create({
+    // Create the comment
+    const comment = await prisma.taskComment.create({
       data: {
         content: data.content,
         taskId: data.taskId,
@@ -90,12 +117,43 @@ export class CommentService {
         },
       },
     });
+
+    // Parse and store user mentions
+    try {
+      const mentions = await UserMentionService.parseMentions(data.content);
+      if (mentions.length > 0) {
+        await UserMentionService.storeMentions(comment.id, mentions);
+        
+        // Send notifications to mentioned users
+        const commentAuthor = `${user.firstName} ${user.lastName}`;
+        await UserMentionService.sendMentionNotifications(
+          comment.id,
+          mentions,
+          commentAuthor,
+          task.name,
+          task.id
+        );
+      }
+    } catch (error) {
+      console.error('Error processing user mentions:', error);
+      // Don't fail the comment creation if mention processing fails
+    }
+
+    // Return comment with mentions
+    return await this.getCommentById(comment.id) as TaskComment;
   }
 
   static async updateComment(id: string, data: UpdateCommentData, userId: string): Promise<TaskComment> {
     // Verify comment exists and belongs to user
     const existingComment = await prisma.taskComment.findUnique({
       where: { id },
+      include: {
+        task: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
 
     if (!existingComment) {
@@ -106,7 +164,8 @@ export class CommentService {
       throw new Error('You can only edit your own comments');
     }
 
-    return await prisma.taskComment.update({
+    // Update the comment
+    const updatedComment = await prisma.taskComment.update({
       where: { id },
       data: {
         content: data.content,
@@ -122,6 +181,39 @@ export class CommentService {
         },
       },
     });
+
+    // Remove old mentions and process new ones
+    try {
+      await UserMentionService.removeCommentMentions(id);
+      
+      const mentions = await UserMentionService.parseMentions(data.content);
+      if (mentions.length > 0) {
+        await UserMentionService.storeMentions(id, mentions);
+        
+        // Send notifications to newly mentioned users
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { firstName: true, lastName: true },
+        });
+        
+        if (user) {
+          const commentAuthor = `${user.firstName} ${user.lastName}`;
+          await UserMentionService.sendMentionNotifications(
+            id,
+            mentions,
+            commentAuthor,
+            existingComment.task.name,
+            existingComment.taskId
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error processing user mentions on update:', error);
+      // Don't fail the comment update if mention processing fails
+    }
+
+    // Return updated comment with mentions
+    return await this.getCommentById(id) as TaskComment;
   }
 
   static async deleteComment(id: string, userId: string): Promise<void> {
@@ -138,6 +230,10 @@ export class CommentService {
       throw new Error('You can only delete your own comments');
     }
 
+    // Remove mentions first
+    await UserMentionService.removeCommentMentions(id);
+
+    // Delete the comment
     await prisma.taskComment.delete({
       where: { id },
     });

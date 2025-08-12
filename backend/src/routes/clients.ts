@@ -29,9 +29,8 @@ const clientFiltersSchema = z.object({
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
-router.use(requireAdmin);
 
-// GET /api/clients - Get all clients with filters and pagination
+// GET /api/clients - Get all clients with filters and pagination (allow authenticated users for project work)
 router.get('/', async (req, res) => {
   try {
     const filters = clientFiltersSchema.parse(req.query);
@@ -60,7 +59,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/clients/:id - Get client by ID
+// GET /api/clients/:id - Get client by ID (allow authenticated users for project work)
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -78,8 +77,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/clients - Create new client
-router.post('/', async (req, res) => {
+// POST /api/clients - Create new client (admin only)
+router.post('/', requireAdmin, async (req, res) => {
   try {
     const data = createClientSchema.parse(req.body);
     const client = await ClientService.createClient(data);

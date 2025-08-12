@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Task, CreateTaskData, UpdateTaskData } from '@/store/taskStore';
+import { Project } from '@/store/projectStore';
 import { useUserStore } from '@/store/userStore';
 import { X, Save, Calendar, Clock, User, AlertCircle } from 'lucide-react';
 
 interface TaskFormProps {
   task?: Task;
-  projectId: string;
+  projects: Project[];
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: CreateTaskData | UpdateTaskData) => Promise<void>;
 }
 
-const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, isOpen, onClose, onSubmit }) => {
+const TaskForm: React.FC<TaskFormProps> = ({ task, projects, isOpen, onClose, onSubmit }) => {
   const { users, fetchUsers } = useUserStore();
   
   const [formData, setFormData] = useState({
@@ -21,7 +22,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, isOpen, onClose, o
     priority: task?.priority || 'MEDIUM',
     estimatedHours: task?.estimatedHours || undefined,
     dueDate: task?.dueDate ? task.dueDate.split('T')[0] : '',
-    assignedTo: task?.assignedTo || '',
+    assignedTo: task?.assignedTo ? (Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo]) : [],
+    projectId: task?.projectId || (projects[0]?.id || ''),
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,7 +44,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, isOpen, onClose, o
         priority: task.priority,
         estimatedHours: task.estimatedHours || undefined,
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-        assignedTo: task.assignedTo || '',
+        assignedTo: task.assignedTo ? (Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo]) : [],
+        projectId: task.projectId || (projects[0]?.id || ''),
       });
     } else {
       setFormData({
@@ -52,11 +55,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, isOpen, onClose, o
         priority: 'MEDIUM',
         estimatedHours: undefined,
         dueDate: '',
-        assignedTo: '',
+        assignedTo: [],
+        projectId: projects[0]?.id || '',
       });
     }
     setErrors({});
-  }, [task]);
+  }, [task, projects]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -88,10 +92,10 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, isOpen, onClose, o
         description: formData.description.trim() || undefined,
         status: formData.status as any,
         priority: formData.priority as any,
-        estimatedHours: formData.estimatedHours,
+        estimatedHours: formData.estimatedHours ? Number(formData.estimatedHours) : undefined,
         dueDate: formData.dueDate || undefined,
-        assignedTo: formData.assignedTo || undefined,
-        ...(task ? {} : { projectId }),
+        assignedTo: formData.assignedTo && formData.assignedTo.length > 0 ? formData.assignedTo : undefined,
+        projectId: formData.projectId,
       };
 
       await onSubmit(submitData as any);
@@ -104,18 +108,10 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, isOpen, onClose, o
     }
   };
 
-  const handleInputChange = (field: string, value: string | number | undefined) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-    
-    // Clear error for this field
+  const handleInputChange = (field: string, value: string | number | undefined | string[]) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: '',
-      }));
+      setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
@@ -144,7 +140,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, isOpen, onClose, o
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">
             {task ? 'Edit Task' : 'Create New Task'}
@@ -273,15 +269,42 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, isOpen, onClose, o
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Assign To
             </label>
+            <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-md p-3">
+              {users.map((user) => (
+                <label key={user.id} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.assignedTo.includes(user.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        handleInputChange('assignedTo', [...formData.assignedTo, user.id]);
+                      } else {
+                        handleInputChange('assignedTo', formData.assignedTo.filter(id => id !== user.id));
+                      }
+                    }}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">
+                    {user.firstName} {user.lastName}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Select one or more users to assign the task to</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Project
+            </label>
             <select
-              value={formData.assignedTo}
-              onChange={(e) => handleInputChange('assignedTo', e.target.value)}
+              value={formData.projectId}
+              onChange={(e) => handleInputChange('projectId', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Unassigned</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.firstName} {user.lastName}
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
                 </option>
               ))}
             </select>

@@ -43,6 +43,8 @@ model User {
   taskComments     TaskComment[]
   timesheets       Timesheet[]
   preferences      UserPreferences?
+  mentionedIn      UserMention[]
+  taskAssignments  TaskAssignment[]
 
   @@index([email])
   @@index([role])
@@ -64,18 +66,26 @@ model Client {
 }
 
 model Project {
-  id          String      @id @default(cuid())
+  id          String         @id @default(cuid())
   name        String
   description String?
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  category    String          @default("DEV")
+  status      ProjectStatus   @default(TODO)
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
   clientId    String
-  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client      Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tasks       Task[]
   timesheets  Timesheet[]
 
   @@index([clientId])
+  @@index([category])
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
   @@map("projects")
 }
 
@@ -88,18 +98,31 @@ model Task {
   estimatedHours Decimal?      @db.Decimal(4, 2)
   actualHours    Decimal?      @db.Decimal(4, 2)
   dueDate        DateTime?
-  assignedTo     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   projectId      String
   comments       TaskComment[]
   project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   timesheets     Timesheet[]
+  assignments    TaskAssignment[]
 
   @@index([projectId])
   @@index([status])
-  @@index([assignedTo])
   @@map("tasks")
+}
+
+model TaskAssignment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_assignments")
 }
 
 model TaskComment {
@@ -111,11 +134,27 @@ model TaskComment {
   userId    String
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mentions  UserMention[]
 
   @@index([taskId])
   @@index([userId])
   @@index([createdAt])
   @@map("task_comments")
+}
+
+model UserMention {
+  id        String   @id @default(cuid())
+  commentId String
+  mentionedUserId String
+  comment   TaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  mentionedUser User @relation(fields: [mentionedUserId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, mentionedUserId])
+  @@index([commentId])
+  @@index([mentionedUserId])
+  @@index([createdAt])
+  @@map("user_mentions")
 }
 
 model Timesheet {
@@ -298,6 +337,7 @@ enum NotificationType {
   PUSH
   SMS
   IN_APP
+  MENTION
 }
 
 enum NotificationStatus {
@@ -320,4 +360,16 @@ enum TaskPriority {
   MEDIUM
   HIGH
   URGENT
+}
+
+
+
+enum ProjectStatus {
+  TODO
+  DOING
+  WAITING_FOR_APPROVAL
+  STALLED
+  CANCELLED
+  WAITING_ON_CLIENT
+  COMPLETED
 }

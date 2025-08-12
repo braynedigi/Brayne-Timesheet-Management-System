@@ -44,8 +44,13 @@ const DashboardPage: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchTimesheets();
-  }, []);
+    // If user is not admin, only fetch their own timesheets
+    if (user && user.role !== 'ADMIN') {
+      fetchTimesheets({ userId: user.id });
+    } else {
+      fetchTimesheets();
+    }
+  }, [user, fetchTimesheets]);
 
   useEffect(() => {
     if (timesheets.length > 0) {
@@ -108,7 +113,7 @@ const DashboardPage: React.FC = () => {
         </div>
         <div className="flex space-x-3">
           <button
-            onClick={() => navigate('/timesheets/new')}
+            onClick={() => navigate('/timesheets?new=true')}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="h-4 w-4 mr-2" />

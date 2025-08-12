@@ -10,12 +10,22 @@ const createProjectSchema = z.object({
   name: z.string().min(1, 'Project name is required'),
   description: z.string().optional(),
   clientId: z.string().min(1, 'Client is required'),
+  category: z.string().optional(),
+  status: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 const updateProjectSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   clientId: z.string().min(1).optional(),
+  category: z.string().optional(),
+  status: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 // GET /api/projects - Get all projects
@@ -62,8 +72,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/projects - Create new project
-router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+// POST /api/projects - Create new project (allow authenticated users)
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const validatedData = createProjectSchema.parse(req.body);
     
@@ -94,7 +104,9 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
 router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('Update project request body:', req.body);
     const validatedData = updateProjectSchema.parse(req.body);
+    console.log('Validated update data:', validatedData);
 
     const project = await ProjectService.updateProject(id, validatedData);
 
