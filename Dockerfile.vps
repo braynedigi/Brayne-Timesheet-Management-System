@@ -1,0 +1,87 @@
+# Production Dockerfile for VPS Deployment
+# Brayne Timesheet Management System
+FROM node:18-alpine AS base
+
+# Install system dependencies
+RUN apk add --no-cache \
+    postgresql-client \
+    openssl \
+    && rm -rf /var/cache/apk/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files for dependency installation
+COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+COPY backend/package*.json ./backend/
+
+# Install dependencies
+RUN npm ci --only=production
+RUN cd frontend && npm ci --only=production
+RUN cd backend && npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client
+RUN cd backend && npx prisma generate
+
+# Build frontend for production
+RUN cd frontend && npm run build
+
+# Build backend TypeScript
+RUN cd backend && npm run build
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Install system dependencies
+RUN apk add --no-cache \
+    postgresql-client \
+    openssl \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=base /app/backend/dist ./backend/dist
+COPY --from=base /app/backend/node_modules ./backend/node_modules
+COPY --from=base /app/backend/package*.json ./backend/
+COPY --from=base /app/backend/prisma ./backend/prisma
+COPY --from=base /app/frontend/dist ./frontend/dist
+COPY --from=base /app/frontend/node_modules ./frontend/node_modules
+COPY --from=base /app/frontend/package*.json ./frontend/
+
+# Create production startup script
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'echo "🚀 Starting Brayne Timesheet Management System..."' >> /app/start.sh && \
+    echo 'cd /app/backend' >> /app/start.sh && \
+    echo 'echo "🗄️ Running database migrations..."' >> /app/start.sh && \
+    echo 'npx prisma migrate deploy' >> /app/start.sh && \
+    echo 'echo "🔧 Starting backend server on port 5000..."' >> /app/start.sh && \
+    echo 'npm start &' >> /app/start.sh && \
+    echo 'echo "⏳ Waiting for backend to start..."' >> /app/start.sh && \
+    echo 'sleep 5' >> /app/start.sh && \
+    echo 'echo "🌐 Starting frontend server on port 3000..."' >> /app/start.sh && \
+    echo 'cd /app/frontend' >> /app/start.sh && \
+    echo 'npm run preview' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
+
+# Change ownership of the app directory
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
+# Expose ports
+EXPOSE 3000 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:5000/api/health || exit 1
+
+# Start the application
+CMD ["/app/start.sh"]
