@@ -22,7 +22,9 @@
     "db:generate": "docker-compose exec backend npx prisma generate",
     "db:studio": "docker-compose exec backend npx prisma studio",
     "db:seed": "docker-compose exec backend npm run db:seed",
-    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install"
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "start": "cd backend && npm start",
+    "postinstall": "cd backend && npm install && cd ../frontend && npm install"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
