@@ -55,19 +55,33 @@ A modern, full-stack timesheet management system built with React, Node.js, and 
    cd Brayne-Timesheet-Management-System
    ```
 
-2. **Start the application**
+2. **Configure environment variables**
    ```bash
-   # Windows
-   .\start.bat
+   # Copy the template file
+   cp env.template .env
    
-   # Linux/Mac
-   ./start.sh
+   # Edit with your values (especially JWT secrets and email)
+   nano .env  # or edit with your preferred editor
    ```
 
-3. **Access the application**
+3. **Start the application**
+   ```bash
+   # Windows
+   .\start-docker.bat
+   
+   # Linux/Mac
+   ./start-docker.sh
+   
+   # Or manually
+   docker-compose up -d
+   ```
+
+4. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:5000
-   - API Documentation: http://localhost:5000/api/docs
+   - Database: localhost:5432
+
+**For detailed Docker setup instructions, see [DOCKER_SETUP.md](./DOCKER_SETUP.md)**
 
 ### Option 2: VPS Deployment (Production)
 
@@ -98,8 +112,13 @@ For VPS deployment without Docker Compose, see [VPS_DEPLOYMENT.md](./VPS_DEPLOYM
 │   │   └── contexts/       # React contexts
 │   └── Dockerfile          # Frontend container
 ├── database/               # Database initialization
-├── docker-compose.yml      # Development environment
+├── docker-compose.yml      # Docker Compose configuration
+├── docker-compose.override.yml # Development overrides
+├── env.template            # Environment variables template
+├── start-docker.bat        # Windows Docker startup script
+├── start-docker.sh         # Linux/Mac Docker startup script
 ├── start-vps.sh           # VPS deployment script
+├── DOCKER_SETUP.md        # Docker setup guide
 └── VPS_DEPLOYMENT.md      # VPS deployment guide
 ```
 
