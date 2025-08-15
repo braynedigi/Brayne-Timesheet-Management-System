@@ -8,10 +8,6 @@ This guide focuses on deploying your timesheet application using **ONLY the Dock
 
 ### **Option 1: Simple Script (Easiest)**
 ```bash
-# Windows
-.\deploy-simple.bat
-
-# Linux/Mac
 ./deploy-simple.sh
 ```
 

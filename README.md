@@ -57,10 +57,6 @@ A modern, full-stack timesheet management system built with React, Node.js, and 
 
 2. **Deploy with simple script**
    ```bash
-   # Windows
-   .\deploy-simple.bat
-   
-   # Linux/Mac
    ./deploy-simple.sh
    ```
 
@@ -77,9 +73,8 @@ For development with hot reloading:
 # Start with Docker Compose
 docker-compose up -d
 
-# Or use the development scripts
-.\start-docker.bat  # Windows
-./start-docker.sh   # Linux/Mac
+# Or use the development script
+./start-docker.sh
 ```
 
 ### Option 2: VPS Deployment (Production)
@@ -114,10 +109,8 @@ For VPS deployment without Docker Compose, see [VPS_DEPLOYMENT.md](./VPS_DEPLOYM
 ├── docker-compose.yml      # Docker Compose configuration
 ├── docker-compose.override.yml # Development overrides
 ├── env.template            # Environment variables template
-├── start-docker.bat        # Windows Docker startup script
-├── start-docker.sh         # Linux/Mac Docker startup script
-├── deploy-simple.bat       # Simple Windows deployment script
-├── deploy-simple.sh        # Simple Linux/Mac deployment script
+├── start-docker.sh         # Docker Compose startup script
+├── deploy-simple.sh        # Simple deployment script
 └── DOCKERFILE_DEPLOYMENT.md # Dockerfile-only deployment guide
 ```
 
@@ -158,8 +151,7 @@ npm run db:seed
 ### Simple Deployment (Recommended)
 ```bash
 # Build and run with single command
-./deploy-simple.sh  # Linux/Mac
-.\deploy-simple.bat # Windows
+./deploy-simple.sh
 
 # Or manually
 docker build -t brayne-timesheet .

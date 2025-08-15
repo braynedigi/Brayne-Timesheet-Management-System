@@ -28,12 +28,6 @@ npm install
 
 #### Option A: Using the startup script (Recommended)
 
-**On Windows:**
-```bash
-start.bat
-```
-
-**On macOS/Linux:**
 ```bash
 chmod +x start.sh
 ./start.sh
