@@ -47,7 +47,7 @@ A modern, full-stack timesheet management system built with React, Node.js, and 
 
 ## 🚀 Quick Start
 
-### Option 1: Docker Compose (Recommended for Development)
+### Option 1: Simple Docker Deploy (Recommended)
 
 1. **Clone the repository**
    ```bash
@@ -55,33 +55,32 @@ A modern, full-stack timesheet management system built with React, Node.js, and 
    cd Brayne-Timesheet-Management-System
    ```
 
-2. **Configure environment variables**
-   ```bash
-   # Copy the template file
-   cp env.template .env
-   
-   # Edit with your values (especially JWT secrets and email)
-   nano .env  # or edit with your preferred editor
-   ```
-
-3. **Start the application**
+2. **Deploy with simple script**
    ```bash
    # Windows
-   .\start-docker.bat
+   .\deploy-simple.bat
    
    # Linux/Mac
-   ./start-docker.sh
-   
-   # Or manually
-   docker-compose up -d
+   ./deploy-simple.sh
    ```
 
-4. **Access the application**
+3. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:5000
-   - Database: localhost:5432
 
-**For detailed Docker setup instructions, see [DOCKER_SETUP.md](./DOCKER_SETUP.md)**
+**For detailed Dockerfile deployment instructions, see [DOCKERFILE_DEPLOYMENT.md](./DOCKERFILE_DEPLOYMENT.md)**
+
+### Option 2: Docker Compose (Development)
+
+For development with hot reloading:
+```bash
+# Start with Docker Compose
+docker-compose up -d
+
+# Or use the development scripts
+.\start-docker.bat  # Windows
+./start-docker.sh   # Linux/Mac
+```
 
 ### Option 2: VPS Deployment (Production)
 
@@ -117,9 +116,9 @@ For VPS deployment without Docker Compose, see [VPS_DEPLOYMENT.md](./VPS_DEPLOYM
 ├── env.template            # Environment variables template
 ├── start-docker.bat        # Windows Docker startup script
 ├── start-docker.sh         # Linux/Mac Docker startup script
-├── start-vps.sh           # VPS deployment script
-├── DOCKER_SETUP.md        # Docker setup guide
-└── VPS_DEPLOYMENT.md      # VPS deployment guide
+├── deploy-simple.bat       # Simple Windows deployment script
+├── deploy-simple.sh        # Simple Linux/Mac deployment script
+└── DOCKERFILE_DEPLOYMENT.md # Dockerfile-only deployment guide
 ```
 
 ## 🔧 Development
@@ -156,7 +155,18 @@ npm run db:seed
 
 ## 🐳 Docker Commands
 
-### Development
+### Simple Deployment (Recommended)
+```bash
+# Build and run with single command
+./deploy-simple.sh  # Linux/Mac
+.\deploy-simple.bat # Windows
+
+# Or manually
+docker build -t brayne-timesheet .
+docker run -d --name brayne-timesheet -p 3000:3000 -p 5000:5000 --restart unless-stopped brayne-timesheet
+```
+
+### Development with Docker Compose
 ```bash
 # Start all services
 docker-compose up -d
@@ -168,18 +178,17 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### Production (VPS)
+### Container Management
 ```bash
-# Build and start services
-./start-vps.sh
-
 # View logs
-docker logs timesheet-frontend
-docker logs timesheet-backend
-docker logs timesheet-postgres
+docker logs -f brayne-timesheet
 
-# Stop services
-docker stop timesheet-frontend timesheet-backend timesheet-postgres
+# Stop/start container
+docker stop brayne-timesheet
+docker start brayne-timesheet
+
+# Remove container
+docker rm brayne-timesheet
 ```
 
 ## 📊 API Endpoints
